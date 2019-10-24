@@ -1,0 +1,4 @@
+-main E2ETests
+-lib hx3compat
+-php _build/e2e/php
+-cmd php _build/e2e/php/index.php
