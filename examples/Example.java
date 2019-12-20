@@ -1,39 +1,43 @@
 import connect.Env;
+import connect.Flow;
 import connect.Logger;
 import connect.Processor;
-import connect.api.QueryParams;
-import connect.models.Request;
+import connect.api.Query;
+import connect.models.IdModel;
 
 
 public class Example {
     public static void main(String[] args) {
-        //Env.initLogger("log.md", Logger.LEVEL_DEBUG, null);
+        //Env.initLogger("log.md", Logger.LEVEL_DEBUG, null, null);
         
-        new Processor()
-            .step("Add dummy data", (Processor p, String input) -> {
-                p.setData("assetId", p.getRequest().asset.id)
-                    .setData("connectionId", p.getRequest().asset.connection.id)
-                    .setData("productId", p.getRequest().asset.product.id)
-                    .setData("status", p.getRequest().status);
-                return p.getRequest().id;
+        // Define main flow
+        Flow flow = new Flow((IdModel m) -> true)
+            .step("Add dummy data", (Flow f) -> {
+                f.setData("requestId", f.getAssetRequest().id)
+                    .setData("assetId", f.getAssetRequest().asset.id)
+                    .setData("connectionId", f.getAssetRequest().asset.connection.id)
+                    .setData("productId", f.getAssetRequest().asset.product.id)
+                    .setData("status", f.getAssetRequest().status);
             })
-            .step("Trace request data", (Processor p, String requestId) -> {
-                System.out.println(requestId
-                    + " : " + p.getData("assetId")
-                    + " : " + p.getData("connectionId")
-                    + " : " + p.getData("productId")
-                    + " : " + p.getData("status"));
-                return "";
-            })
+            .step("Trace request data", (Flow f) -> {
+                System.out.println(f.getData("requestId")
+                    + " : " + f.getData("assetId")
+                    + " : " + f.getData("connectionId")
+                    + " : " + f.getData("productId")
+                    + " : " + f.getData("status"));
+            });
             /*
-            .step("Approve request", (Processor p, String input) -> {
-                p.getRequest().approveByTemplate("TL-000-000-000");
-                p.getRequest().approveByTile("Markdown text");
-                return "";
+            .step("Approve request", (Processor p) -> {
+                p.getAssetRequest().approveByTemplate("TL-000-000-000");
+                p.getAssetRequest().approveByTile("Markdown text");
             })
             */
-            .run(Request.class, new QueryParams()
-                .set("asset.product.id__in", Env.getConfig().getProductsString())
-                .set("status", "pending"));
+        
+        // Process requests
+        new Processor()
+            .flow(flow)
+            .processRequests(new Query()
+                .equal("asset.product.id__in", Env.getConfig().getProductsString())
+                .equal("status", "pending"));
     }
 }

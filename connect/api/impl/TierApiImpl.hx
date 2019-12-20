@@ -1,81 +1,80 @@
 package connect.api.impl;
 
 
-class TierApiImpl implements ITierApi {
-    private static inline var TCR_PATH = 'tier/config-requests';
-    private static inline var TA_PATH = 'tier/accounts';
-    private static inline var TC_PATH = 'tier/configs';
-
+class TierApiImpl extends Base implements ITierApi {
+    private static final TCR_PATH = 'tier/config-requests';
+    private static final TA_PATH = 'tier/accounts';
+    private static final TC_PATH = 'tier/configs';
 
     public function new() {}
 
 
-    public function listTierConfigRequests(filters: QueryParams): Array<Dynamic> {
-        return Env.getApiClient().get(TCR_PATH, null, null, filters);
+    public function listTierConfigRequests(filters: Query): String {
+        return ConnectHelper.get(TCR_PATH, null, null, filters);
     }
 
 
-    public function createTierConfigRequest(): Dynamic {
-        return Env.getApiClient().post(TCR_PATH);
+    public function createTierConfigRequest(body: String): String {
+        return ConnectHelper.post(TCR_PATH, null, null, body);
     }
 
 
-    public function getTierConfigRequest(id: String): Dynamic {
-        return Env.getApiClient().get(TCR_PATH, id);
+    public function getTierConfigRequest(id: String): String {
+        return ConnectHelper.get(TCR_PATH, id);
     }
 
 
-    public function updateTierConfigRequest(id: String, tcr: String): Dynamic {
-        return Env.getApiClient().put(TCR_PATH, id, tcr);
+    public function updateTierConfigRequest(id: String, tcr: String): String {
+        return ConnectHelper.put(TCR_PATH, id, tcr);
     }
 
 
-    public function pendTierConfigRequest(id: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'pend');
+    public function pendTierConfigRequest(id: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'pend');
     }
 
 
-    public function inquireTierConfigRequest(id: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'inquire');
+    public function inquireTierConfigRequest(id: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'inquire');
     }
 
 
-    public function approveTierConfigRequest(id: String, data: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'approve', data);
+    public function approveTierConfigRequest(id: String, data: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'approve', data);
     }
 
 
-    public function failTierConfigRequest(id: String, data: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'fail', data);
+    public function failTierConfigRequest(id: String, data: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'fail', data);
     }
 
 
-    public function assignTierConfigRequest(id: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'assign');
+    public function assignTierConfigRequest(id: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'assign');
     }
 
 
-    public function unassignTierConfigRequest(id: String): Dynamic {
-        return Env.getApiClient().post(TCR_PATH, id, 'unassign');
+    public function unassignTierConfigRequest(id: String): String {
+        return ConnectHelper.post(TCR_PATH, id, 'unassign');
     }
 
 
-    public function listTierAccounts(filters: QueryParams): Array<Dynamic> {
-        return Env.getApiClient().get(TA_PATH, null, null, filters);
+    public function listTierAccounts(filters: Query): String {
+        return ConnectHelper.get(TA_PATH, null, null, filters);
     }
 
 
-    public function getTierAccount(id: String): Dynamic {
-        return Env.getApiClient().get(TA_PATH, id);
+    public function getTierAccount(id: String): String {
+        return ConnectHelper.get(TA_PATH, id);
     }
 
 
-    public function listTierConfigs(filters: QueryParams): Array<Dynamic> {
-        return Env.getApiClient().get(TC_PATH, null, null, filters);
+    public function listTierConfigs(filters: Query): String {
+        return ConnectHelper.get(TC_PATH, null, null, filters, true);
     }
 
 
-    public function getTierConfig(id: String): Dynamic {
-        return Env.getApiClient().get(TC_PATH, id);
+    public function getTierConfig(id: String): String {
+        return ConnectHelper.get(TC_PATH, id);
     }
 }

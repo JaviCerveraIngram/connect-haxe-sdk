@@ -2,350 +2,258 @@ package connect.api.impl;
 
 import haxe.Constraints.Function;
 #if !js
-import haxe.io.StringInput;
+import haxe.io.BytesInput;
 #end
 
 
-class ApiClientImpl implements IApiClient {
+class ApiClientImpl extends Base implements IApiClient {
     public function syncRequest(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: String) : Response {        
-        // Write call info
-        writeRequestCall(Env.getLogger().info, method, url, headers, body);
-
+            fileArg: String, fileName: String, fileContent: Blob) : Response {
         #if js
-            initXMLHttpRequest();
-
-            var xhr = new js.html.XMLHttpRequest();
-            xhr.timeout = 300000;
-            xhr.open(method.toUpperCase(), url, false);
-
-            if (headers != null) {
-                var keys = headers.keys();
-                for (key in keys) {
-                    xhr.setRequestHeader(key, headers.get(key));
-                }
-            }
-
-            if (body != null) {
-                xhr.send(body);
-            } else if (fileArg != null && fileName != null && fileContent != null) {
-                var formData = new js.html.FormData();
-                formData.append(fileArg, fileContent);
-                xhr.send(formData);
-            } else {
-                xhr.send();
-            }
-
-            if (xhr.readyState == js.html.XMLHttpRequest.UNSENT) {
-                if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR) {
-                    writeRequestCall(Env.getLogger().error, method, url, headers, body);
-                }
-                Env.getLogger().error('> * Exception: ${xhr.responseText}');
-                Env.getLogger().error('');
-                throw xhr.responseText != null
-                    ? xhr.responseText
-                    : 'Error sending ${method} request to "${url}."';
-            }
-
-            var response = new Response(xhr.status, xhr.responseText);
+            final response = syncRequestJS(method, url, headers, body, fileArg, fileName, fileContent);
         #elseif use_tink
-            var methods = [
-                'GET' => tink.http.Method.GET,
-                'PUT' => tink.http.Method.PUT,
-                'POST' => tink.http.Method.POST
-            ];
-
-            var tinkMethod: tink.http.Method = null;
-            try {
-                tinkMethod = methods.get(method.toUpperCase());
-            } catch (e: Dynamic) {
-                if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR) {
-                    writeRequestCall(Env.getLogger().error, method, url, headers, body);
-                }
-                Env.getLogger().error('');
-                throw 'Invalid request method ${method}';
-            }
-
-            var response: Response = null;
-
-            var parsedHeaders = new Array<tink.http.Header.HeaderField>();
-            if (headers != null) {
-                var keys = headers.keys();
-                for (key in keys) {
-                    parsedHeaders.push(new tink.http.Header.HeaderField(key, headers.get(key)));
-                }
-            }
-
-            var options = new Dictionary();
-            options.set('method', tinkMethod);
-            if (parsedHeaders.keys().length > 0) {
-                options.set('headers', parsedHeaders);
-            }
-            if (body != null) {
-                options.set('body', body);
-            }
-
-            tink.http.Client.fetch(url, options.toObject()).all().handle(function(o) {
-                switch (o) {
-                    case Success(res):
-                        response = new Response(res.header.statusCode, res.body.toString());
-                    case Failure(res):
-                        if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR) {
-                            writeRequestCall(Env.getLogger().error, method, url, headers, body);
-                        }
-                        Env.getLogger().error('> * Exception: ${res}');
-                        Env.getLogger().error('');
-                        throw res.toString();
-                }
-            });
-            
-            // Wait for async request
-            while (response == null) {}
+            final response = syncRequestTink(method, url, headers, body, fileArg, fileName, fileContent);
         #elseif python
-            var parsedHeaders = new python.Dict<String, Dynamic>();
-            if (headers != null) {
-                var keys = headers.keys();
-                for (key in keys) {
-                    parsedHeaders.set(key, headers.get(key));
-                }
-            }
-
-            var response: Response = null;
-            try {
-                response = connect.native.PythonRequest.request(
-                    method, url, parsedHeaders, body, 300);
-            } catch (ex: Dynamic) {
-                if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR) {
-                    writeRequestCall(Env.getLogger().error, method, url, headers, body);
-                }
-                Env.getLogger().error('> * Exception: ${ex}');
-                Env.getLogger().error('');
-                throw ex;
-            }
+            final response = syncRequestPython(method, url, headers, body, fileArg, fileName, fileContent);
         #else
-            var status:Null<Int> = null;
-            var responseBytes = new haxe.io.BytesOutput();
-
-            var http = new haxe.Http(url);
-            http.cnxTimeout = 300;
-
-            if (headers != null) {
-                var keys = headers.keys();
-                for (key in keys) {
-                    http.setHeader(key, headers.get(key));
-                }
-            }
-
-            if (body != null) {
-                http.setPostData(body);
-            }
-
-            if (fileArg != null && fileName != null && fileContent != null) {
-                http.fileTransfer(
-                    fileArg,
-                    fileName,
-                    new StringInput(fileContent),
-                    fileContent.length,
-                    'multipart/form-data'
-                );
-            }
-
-            http.onStatus = function(status_) { status = status_; };
-            http.onError = function(msg) {
-                if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR) {
-                    writeRequestCall(Env.getLogger().error, method, url, headers, body);
-                }
-                Env.getLogger().error(
-                    '> * Exception (${status}): ${responseBytes.getBytes().toString()}');
-                Env.getLogger().error('');
-                throw msg;
-            }
-            http.customRequest(false, responseBytes, null, method.toUpperCase());
-
-            while (status == null) {} // Wait for async request
-            var response = new Response(status, responseBytes.getBytes().toString());
+            final response = syncRequestStd(method, url, headers, body, fileArg, fileName, fileContent);
         #end
 
-        // If error response, write call to error log level
-        if (Env.getLogger().getLevel() == Logger.LEVEL_ERROR && response.status >= 400) {
-            writeRequestCall(Env.getLogger().error, method, url, headers, body);
+        final level = (response.status >= 400 || response.status == -1)
+            ? Logger.LEVEL_ERROR
+            : Logger.LEVEL_INFO;
+        logRequest(level, method, url, headers, body, response);
+
+        if (response.status != -1) {
+            return response;
+        } else {
+            throw response.text;
         }
-
-        // Write response to error or info level, depending on status
-        writeRequestResponse(
-            (response.status >= 400) ? Env.getLogger().error : Env.getLogger().info,
-            response);
-        
-        return response;
-    }
-
-
-    public function get(resource: String, ?id: String, ?suffix: String,
-            ?params: QueryParams): Dynamic {
-        return checkResponse(connectSyncRequest('GET', parsePath(resource, id, suffix),
-            getHeaders(), params));
-    }
-
-
-    public function getString(resource: String, ?id: String, ?suffix: String,
-            ?params: QueryParams): String {
-        return checkStringResponse(connectSyncRequest('GET', parsePath(resource, id, suffix),
-            getHeaders(), params));
-    }
-
-
-    public function put(resource: String, id: String, body: String): Dynamic {
-        return checkResponse(connectSyncRequest('PUT', parsePath(resource, id),
-            getHeaders(), body));
-    }
-
-
-    public function post(resource: String, ?id: String, ?suffix: String, ?body: String): Dynamic {
-        return checkResponse(connectSyncRequest('POST', parsePath(resource, id, suffix),
-            getHeaders(), body));
-    }
-
-
-    public function postFile(resource: String, ?id: String, ?suffix: String,
-        fileArg: String, fileName: String, fileContents: String): Dynamic {
-        return checkResponse(connectSyncRequest('POST', parsePath(resource, id, suffix),
-            getHeaders('multipart/form-data'), null, fileArg, fileName, fileContents));
-    }
-
-
-    public function delete(resource: String, id: String, ?suffix: String): Dynamic {
-        return checkResponse(connectSyncRequest('DELETE', parsePath(resource, id, suffix), getHeaders()));
     }
 
 
     public function new() {}
 
 
-    private function connectSyncRequest(method: String, path: String, headers: Dictionary,
-            ?params: QueryParams, ?data: String,
-            ?fileArg: String, ?fileName: String, ?fileContent: String) : Response {
-        var url = Env.getConfig().getApiUrl() + path + ((params != null) ? params.toString() : '');
-        return this.syncRequest(method, url, headers, data, fileArg, fileName, fileContent);
-    }
+#if js
+    private static function syncRequestJS(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob) : Response {
+        initXMLHttpRequest();
 
+        final xhr = new js.html.XMLHttpRequest();
+        xhr.timeout = 300000;
+        xhr.open(method.toUpperCase(), url, false);
 
-    private function getHeaders(contentType: String = 'application/json'): Dictionary {
-        var headers = new Dictionary();
-        headers.set('Authorization', Env.getConfig().getApiKey());
-        headers.set('Content-Type', contentType);
-        return headers;
-    }
-
-
-    private function writeRequestCall(loggerFunc: Function, method: String, url: String,
-            headers: Dictionary, body: String) {
-        var maskedHeaders = headers;
-        if (loggerFunc != Env.getLogger().debug && headers != null) {
-            maskedHeaders = new Dictionary();
+        if (headers != null) {
             for (key in headers.keys()) {
-                if (key == 'Authorization') {
-                    var auth = Std.string(headers.get('Authorization'));
-                    if (StringTools.startsWith(auth, 'ApiKey ')) {
-                        var parts = auth.split(':');
-                        if (parts.length > 1) {
-                            var join = parts.slice(1).join(':');
-                            auth = parts[0] + ':'
-                                + StringTools.lpad(join.substr(join.length - 4), '*', join.length);
-                        } else {
-                            auth = 'ApiKey '
-                                + StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length - 7);
-                        }
-                    } else {
-                        auth = StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length);
-                    }
-                    maskedHeaders.set('Authorization', auth);
-                } else {
-                    maskedHeaders.set(key, headers.get(key));
-                }
+                xhr.setRequestHeader(key, headers.get(key));
             }
         }
 
-        Reflect.callMethod(Env.getLogger(), loggerFunc,
-            ['> Http ${method.toUpperCase()} Request to ${url}']);
-        if (maskedHeaders != null) {
-            Reflect.callMethod(Env.getLogger(), loggerFunc, ['> * Headers:']);
-            Reflect.callMethod(Env.getLogger(), loggerFunc, ['> | Name | Value |']);
-            Reflect.callMethod(Env.getLogger(), loggerFunc, ['> | ---- | ----- |']);
-            for (key in maskedHeaders.keys()) {
-                Reflect.callMethod(Env.getLogger(), loggerFunc,
-                    ['> | ${key} | ${maskedHeaders.get(key)} |']);
+        if (body != null) {
+            xhr.send(body);
+        } else if (fileArg != null && fileName != null && fileContent != null) {
+            final formData = new js.html.FormData();
+            final blob = new js.html.Blob([fileContent._getBytes().getData()]);
+            formData.append(fileArg, blob, fileName);
+            xhr.send(formData);
+        } else {
+            xhr.send();
+        }
+
+        if (xhr.readyState == js.html.XMLHttpRequest.UNSENT) {
+            final message = (xhr.responseText != null)
+                ? xhr.responseText
+                : 'Error sending ${method} request to "${url}."';
+            return new Response(-1, message, xhr.response);
+        }
+
+        return new Response(xhr.status, xhr.responseText, xhr.response);
+    }
+
+
+#elseif use_tink
+    private static function syncRequestTink(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob) : Response {
+        final methods = [
+            'GET' => tink.http.Method.GET,
+            'PUT' => tink.http.Method.PUT,
+            'POST' => tink.http.Method.POST
+        ];
+
+        var tinkMethod: tink.http.Method = null;
+        try {
+            tinkMethod = methods.get(method.toUpperCase());
+        } catch (e: Dynamic) {
+            return new Response(-1, 'Invalid request method ${method}', null);
+        }
+
+        var response: Response = null;
+
+        final parsedHeaders = new Array<tink.http.Header.HeaderField>();
+        if (headers != null) {
+            for (key in headers.keys()) {
+                parsedHeaders.push(new tink.http.Header.HeaderField(key, headers.get(key)));
             }
+        }
+
+        final options = new Dictionary();
+        options.set('method', tinkMethod);
+        if (parsedHeaders.keys().length > 0) {
+            options.set('headers', parsedHeaders);
         }
         if (body != null) {
-            if (Inflection.isJson(body)) {
-                var compact = Env.getLogger().getLevel() != Logger.LEVEL_DEBUG;
-                var prefix = compact ? '> * Body (compact):' : '> * Body:';
-                var formatted = getFormattedData(body, prefix, compact);
-                Reflect.callMethod(Env.getLogger(), loggerFunc, [formatted]);
-            } else {
-                body = StringTools.lpad(body.substr(body.length - 4), '*', body.length);
-                Reflect.callMethod(Env.getLogger(), loggerFunc, ['> * Body: ${body}']);
+            options.set('body', body);
+        }
+
+        tink.http.Client.fetch(url, options.toObject()).all().handle(function(o) {
+            switch (o) {
+                case Success(res):
+                    response = new Response(res.header.statusCode, res.body.toString());
+                case Failure(res):
+                    response = new Response(-1, Std.string(res), null);
+            }
+        });
+        
+        // Wait for async request
+        while (response == null) {}
+
+        return response;
+    }
+
+
+#elseif python
+    private static function syncRequestPython(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob) : Response {
+        try {
+            return connect.native.PythonRequest.request(
+                method, url, headers, body, fileArg, fileName, fileContent, 300);
+        } catch (ex: Dynamic) {
+            return new Response(-1, Std.string(ex), null);
+        }
+    }
+
+
+#else
+    public function syncRequestStd(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob) : Response {
+        var status:Null<Int> = null;
+        final responseBytes = new haxe.io.BytesOutput();
+
+        final http = new haxe.Http(url);
+        http.cnxTimeout = 300;
+
+        if (headers != null) {
+            for (key in headers.keys()) {
+                http.setHeader(key, headers.get(key));
             }
         }
-    }
 
-
-    private function writeRequestResponse(loggerFunc: Function, response: Response) {
-        Reflect.callMethod(Env.getLogger(), loggerFunc, ['> * Status: ${response.status}']);
-        if (Inflection.isJson(response.text)) {
-            var compact = Env.getLogger().getLevel() != Logger.LEVEL_DEBUG;
-            var prefix = compact ? '> * Response (compact):' : '> * Response:';
-            var formatted = getFormattedData(response.text, prefix, compact);
-            Reflect.callMethod(Env.getLogger(), loggerFunc, [formatted]);
-        } else {
-            var text = response.text;
-            text = StringTools.lpad(text.substr(text.length - 4), '*', text.length);
-            Reflect.callMethod(Env.getLogger(), loggerFunc, ['> * Response: ${text}']);
+        if (body != null) {
+            http.setPostData(body);
         }
-        Reflect.callMethod(Env.getLogger(), loggerFunc, ['']);
-    }
 
-
-    private function getFormattedData(data: String, prefix: String, compact: Bool): String {
-        var beautified = Inflection.beautify(data, compact);
-        if (!compact || Inflection.isJsonArray(beautified)) {
-            return prefix + '\r\n'
-                + '> ```json' + '\r\n'
-                + '> ${beautified}' + '\r\n'
-                + '> ```';
-        } else {
-            return '${prefix} ${beautified}';
+        if (fileArg != null && fileName != null && fileContent != null) {
+            http.fileTransfer(
+                fileArg,
+                fileName,
+                new BytesInput(fileContent._getBytes()),
+                fileContent.length(),
+                'multipart/form-data'
+            );
         }
-    }
 
-
-    private function parsePath(resource: String, ?id: String, ?suffix: String): String {
-        return resource
-            + (id != null ? "/" + id : "")
-            + (suffix != null ? "/" + suffix : "");
-    }
-
-
-    private function checkResponse(response: Response): Dynamic {
-        if (response.status < 400) {
-            return haxe.Json.parse(response.text);
-        } else {
-            throw response.text;
+        http.onStatus = function(status_) { status = status_; };
+        http.onError = function(msg) {
+            status = -1;
+            responseBytes.writeString(msg);
         }
+        http.customRequest(false, responseBytes, null, method.toUpperCase());
+
+        while (status == null) {} // Wait for async request
+        final bytes = responseBytes.getBytes();
+        return new Response(status, bytes.toString(), Blob._fromBytes(bytes));
+    }
+#end
+
+
+    private static function logRequest(level: Int, method: String, url: String,
+            headers: Dictionary, body: String, response: Response): Void {
+        final fmt = Env.getLogger().getFormatter();
+        
+        final firstMessage = 'Http ${method.toUpperCase()} request to ${url}';
+        
+        final requestList = new Collection<String>();
+        if (headers != null) {
+            requestList.push('Headers:${getHeadersTable(headers)}');
+        }
+        if (body != null) {
+            requestList.push(getFormattedData(body, 'Body'));
+        }
+        if (response.status != -1) {
+            requestList.push('Status: ${response.status}');
+            requestList.push(getFormattedData(response.text, 'Response'));
+        }
+
+        Env.getLogger().writeBlock(level, '$firstMessage${fmt.formatList(requestList)}');
     }
 
 
-    private function checkStringResponse(response: Response): String {
-        if (response.status < 400) {
-            return response.text;
+    private static function getHeadersTable(headers: Dictionary): String {
+        final fixedHeaders = (Env.getLogger().getLevel() == Logger.LEVEL_DEBUG)
+            ? headers
+            : maskHeaders(headers);
+        final headerKeys = [for (key in fixedHeaders.keys()) key];
+        final headersCol = new Collection<Collection<String>>()
+            .push(new Collection<String>().push('Name').push('Value'));
+        Lambda.iter(headerKeys, function(key) {
+            headersCol.push(
+                new Collection<String>()
+                    .push(key)
+                    .push(fixedHeaders.get(key))
+            );
+        });
+        return Env.getLogger().getFormatter().formatTable(headersCol);
+    }
+
+
+    private static function maskHeaders(headers: Dictionary): Dictionary {
+        final masked = new Dictionary();
+        for (key in headers.keys()) {
+            if (key == 'Authorization') {
+                final auth = Std.string(headers.get('Authorization'));
+                final parts = auth.split(':');
+                final join = (parts.length > 1) ? parts.slice(1).join(':') : '';
+                final maskedAuth = StringTools.startsWith(auth, 'ApiKey ')
+                    ? (parts.length > 1)
+                        ? (parts[0] + ':' + StringTools.lpad(join.substr(join.length - 4), '*', join.length))
+                        : 'ApiKey ' + StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length - 7)
+                    : StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length);
+                masked.set('Authorization', maskedAuth);
+            } else {
+                masked.set(key, headers.get(key));
+            }
+        }
+        return masked;
+    }
+
+
+    private static function getFormattedData(data: String, title: String): String {
+        if (Util.isJson(data)) {
+            final compact = Env.getLogger().getLevel() != Logger.LEVEL_DEBUG;
+            final prefix = compact ? '$title (compact):' : '$title:';
+            final block = Env.getLogger().getFormatter()
+                .formatCodeBlock(Util.beautify(data, compact), 'json');
+            return '$prefix $block';
         } else {
-            throw response.text;
+            final fixedBody = StringTools.lpad(data.substr(data.length - 4), '*', data.length);
+            return '$title: $fixedBody';
         }
     }
 
 
 #if js
-    private static inline var _JS_CODE = 'var Url=require("url"),spawn=require("child_process").spawn,fs=require("fs");global.XMLHttpRequest = function(){"use strict";var S,w,N=this,v=require("http"),g=require("https"),T={},s=!1,C={"User-Agent":"node-XMLHttpRequest",Accept:"*/*"},D={},O={},r=["accept-charset","accept-encoding","access-control-request-headers","access-control-request-method","connection","content-length","content-transfer-encoding","cookie","cookie2","date","expect","host","keep-alive","origin","referer","te","trailer","transfer-encoding","upgrade","via"],o=["TRACE","TRACK","CONNECT"],R=!1,q=!1,n={};this.UNSENT=0,this.OPENED=1,this.HEADERS_RECEIVED=2,this.LOADING=3,this.DONE=4,this.readyState=this.UNSENT,this.onreadystatechange=null,this.responseText="",this.responseXML="",this.status=null,this.statusText=null,this.withCredentials=!1;this.open=function(e,t,s,r,n){if(this.abort(),q=!1,!function(e){return e&&-1===o.indexOf(e)}(e))throw new Error("SecurityError: Request method not allowed");T={method:e,url:t.toString(),async:"boolean"!=typeof s||s,user:r||null,password:n||null},L(this.OPENED)},this.setDisableHeaderCheck=function(e){s=e},this.setRequestHeader=function(e,t){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN");if(function(e){return s||e&&-1===r.indexOf(e.toLowerCase())}(e)){if(R)throw new Error("INVALID_STATE_ERR: send flag is true");e=O[e.toLowerCase()]||e,O[e.toLowerCase()]=e,D[e]=D[e]?D[e]+", "+t:t}else console.warn(\'Refused to set unsafe header \\"\'+e+\'\\"\')},this.getResponseHeader=function(e){return"string"==typeof e&&this.readyState>this.OPENED&&w&&w.headers&&w.headers[e.toLowerCase()]&&!q?w.headers[e.toLowerCase()]:null},this.getAllResponseHeaders=function(){if(this.readyState<this.HEADERS_RECEIVED||q)return"";var e="";for(var t in w.headers)"set-cookie"!==t&&"set-cookie2"!==t&&(e+=t+": "+w.headers[t]+"\\r\\n");return e.substr(0,e.length-2)},this.getRequestHeader=function(e){return"string"==typeof e&&O[e.toLowerCase()]?D[O[e.toLowerCase()]]:""},this.send=function(e){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");if(R)throw new Error("INVALID_STATE_ERR: send has already been called");var n,t=!1,s=!1,r=Url.parse(T.url);switch(r.protocol){case"https:":t=!0;case"http:":n=r.hostname;break;case"file:":s=!0;break;case void 0:case null:case"":n="localhost";break;default:throw new Error("Protocol not supported.")}if(s){if("GET"!==T.method)throw new Error("XMLHttpRequest: Only GET method is supported");if(T.async)fs.readFile(r.pathname,"utf8",function(e,t){e?N.handleError(e):(N.status=200,N.responseText=t,L(N.DONE))});else try{this.responseText=fs.readFileSync(r.pathname,"utf8"),this.status=200,L(N.DONE)}catch(e){this.handleError(e)}}else{var o=r.port||(t?443:80),a=r.pathname+(r.search?r.search:"");for(var i in C)O[i.toLowerCase()]||(D[i]=C[i]);if(D.Host=n,"["===r.host[0]&&(D.Host="["+D.Host+"]"),t&&443===o||80===o||(D.Host+=":"+r.port),T.user){void 0===T.password&&(T.password="");var h=new Buffer(T.user+":"+T.password);D.Authorization="Basic "+h.toString("base64")}"GET"===T.method||"HEAD"===T.method?e=null:e?(D["Content-Length"]=Buffer.isBuffer(e)?e.length:Buffer.byteLength(e),this.getRequestHeader("Content-Type")||(D["Content-Type"]="text/plain;charset=UTF-8")):"POST"===T.method&&(D["Content-Length"]=0);var d={host:n,port:o,path:a,method:T.method,headers:D,agent:!1,withCredentials:N.withCredentials};if(q=!1,T.async){var u=t?g.request:v.request;R=!0,N.dispatchEvent("readystatechange");var c=function(e){N.handleError(e)};S=u(d,function e(t){if(301!==(w=t).statusCode&&302!==w.statusCode&&303!==w.statusCode&&307!==w.statusCode)w.setEncoding("utf8"),L(N.HEADERS_RECEIVED),N.status=w.statusCode,w.on("data",function(e){e&&(N.responseText+=e),R&&L(N.LOADING)}),w.on("end",function(){R&&(L(N.DONE),R=!1)}),w.on("error",function(e){N.handleError(e)});else{T.url=w.headers.location;var s=Url.parse(T.url);n=s.hostname;var r={hostname:s.hostname,port:s.port,path:s.path,method:303===w.statusCode?"GET":T.method,headers:D,withCredentials:N.withCredentials};(S=u(r,e).on("error",c)).end()}}).on("error",c),e&&S.write(e),S.end(),N.dispatchEvent("loadstart")}else{var f=".node-xmlhttprequest-content-"+process.pid,l=".node-xmlhttprequest-sync-"+process.pid;fs.writeFileSync(l,"","utf8");for(var p="var http = require(\'http\'), https = require(\'https\'), fs = require(\'fs\');var doRequest = http"+(t?"s":"")+".request;var options = "+JSON.stringify(d)+";var responseText = \'\';var req = doRequest(options, function(response) {response.setEncoding(\'utf8\');response.on(\'data\', function(chunk) {  responseText += chunk;});response.on(\'end\', function() {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: null, data: {statusCode: response.statusCode, headers: response.headers, text: responseText}}), \'utf8\');fs.unlinkSync(\'"+l+"\');});response.on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});}).on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});"+(e?"req.write(\'"+JSON.stringify(e).slice(1,-1).replace(/\'/g,"\\\'")+"\');":"")+"req.end();",E=spawn(process.argv[0],["-e",p]);fs.existsSync(l););var y=JSON.parse(fs.readFileSync(f,"utf8"));E.stdin.end(),fs.unlinkSync(f),y.err?N.handleError(y.err):(w=y.data,N.status=y.data.statusCode,N.responseText=y.data.text,L(N.DONE))}}},this.handleError=function(e){this.status=0,this.statusText=e,this.responseText=e.stack,q=!0,L(this.DONE),this.dispatchEvent("error")},this.abort=function(){S&&(S.abort(),S=null),D=C,this.status=0,this.responseText="",this.responseXML="",q=!0,this.readyState===this.UNSENT||this.readyState===this.OPENED&&!R||this.readyState===this.DONE||(R=!1,L(this.DONE)),this.readyState=this.UNSENT,this.dispatchEvent("abort")},this.addEventListener=function(e,t){e in n||(n[e]=[]),n[e].push(t)},this.removeEventListener=function(e,t){e in n&&(n[e]=n[e].filter(function(e){return e!==t}))},this.dispatchEvent=function(e){if("function"==typeof N["on"+e]&&N["on"+e](),e in n)for(var t=0,s=n[e].length;t<s;t++)n[e][t].call(N)};var L=function(e){e!=N.LOADING&&N.readyState===e||(N.readyState=e,(T.async||N.readyState<N.OPENED||N.readyState===N.DONE)&&N.dispatchEvent("readystatechange"),N.readyState!==N.DONE||q||(N.dispatchEvent("load"),N.dispatchEvent("loadend")))}};';
+    private static inline final _JS_CODE = 'var Url=require("url"),spawn=require("child_process").spawn,fs=require("fs");global.XMLHttpRequest = function(){"use strict";var S,w,N=this,v=require("http"),g=require("https"),T={},s=!1,C={"User-Agent":"node-XMLHttpRequest",Accept:"*/*"},D={},O={},r=["accept-charset","accept-encoding","access-control-request-headers","access-control-request-method","connection","content-length","content-transfer-encoding","cookie","cookie2","date","expect","host","keep-alive","origin","referer","te","trailer","transfer-encoding","upgrade","via"],o=["TRACE","TRACK","CONNECT"],R=!1,q=!1,n={};this.UNSENT=0,this.OPENED=1,this.HEADERS_RECEIVED=2,this.LOADING=3,this.DONE=4,this.readyState=this.UNSENT,this.onreadystatechange=null,this.responseText="",this.responseXML="",this.status=null,this.statusText=null,this.withCredentials=!1;this.open=function(e,t,s,r,n){if(this.abort(),q=!1,!function(e){return e&&-1===o.indexOf(e)}(e))throw new Error("SecurityError: Request method not allowed");T={method:e,url:t.toString(),async:"boolean"!=typeof s||s,user:r||null,password:n||null},L(this.OPENED)},this.setDisableHeaderCheck=function(e){s=e},this.setRequestHeader=function(e,t){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN");if(function(e){return s||e&&-1===r.indexOf(e.toLowerCase())}(e)){if(R)throw new Error("INVALID_STATE_ERR: send flag is true");e=O[e.toLowerCase()]||e,O[e.toLowerCase()]=e,D[e]=D[e]?D[e]+", "+t:t}else console.warn(\'Refused to set unsafe header \\"\'+e+\'\\"\')},this.getResponseHeader=function(e){return"string"==typeof e&&this.readyState>this.OPENED&&w&&w.headers&&w.headers[e.toLowerCase()]&&!q?w.headers[e.toLowerCase()]:null},this.getAllResponseHeaders=function(){if(this.readyState<this.HEADERS_RECEIVED||q)return"";var e="";for(var t in w.headers)"set-cookie"!==t&&"set-cookie2"!==t&&(e+=t+": "+w.headers[t]+"\\r\\n");return e.substr(0,e.length-2)},this.getRequestHeader=function(e){return"string"==typeof e&&O[e.toLowerCase()]?D[O[e.toLowerCase()]]:""},this.send=function(e){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");if(R)throw new Error("INVALID_STATE_ERR: send has already been called");var n,t=!1,s=!1,r=Url.parse(T.url);switch(r.protocol){case"https:":t=!0;case"http:":n=r.hostname;break;case"file:":s=!0;break;case void 0:case null:case"":n="localhost";break;default:throw new Error("Protocol not supported.")}if(s){if("GET"!==T.method)throw new Error("XMLHttpRequest: Only GET method is supported");if(T.async)fs.readFile(r.pathname,"utf8",function(e,t){e?N.handleError(e):(N.status=200,N.responseText=t,L(N.DONE))});else try{this.responseText=fs.readFileSync(r.pathname,"utf8"),this.status=200,L(N.DONE)}catch(e){this.handleError(e)}}else{var o=r.port||(t?443:80),a=r.pathname+(r.search?r.search:"");for(var i in C)O[i.toLowerCase()]||(D[i]=C[i]);if(D.Host=n,"["===r.host[0]&&(D.Host="["+D.Host+"]"),t&&443===o||80===o||(D.Host+=":"+r.port),T.user){void 0===T.password&&(T.password="");var h=new Buffer(T.user+":"+T.password);D.Authorization="Basic "+h.toString("base64")}"GET"===T.method||"HEAD"===T.method?e=null:e?(D["Content-Length"]=Buffer.isBuffer(e)?e.length:Buffer.byteLength(e),this.getRequestHeader("Content-Type")||(D["Content-Type"]="text/plain;charset=UTF-8")):"POST"===T.method&&(D["Content-Length"]=0);var d={host:n,port:o,path:a,method:T.method,headers:D,agent:!1,withCredentials:N.withCredentials};if(q=!1,T.async){var u=t?g.request:v.request;R=!0,N.dispatchEvent("readystatechange");var c=function(e){N.handleError(e)};S=u(d,function e(t){if(301!==(w=t).statusCode&&302!==w.statusCode&&303!==w.statusCode&&307!==w.statusCode)w.setEncoding("utf8"),L(N.HEADERS_RECEIVED),N.status=w.statusCode,w.on("data",function(e){e&&(N.responseText+=e),R&&L(N.LOADING)}),w.on("end",function(){R&&(L(N.DONE),R=!1)}),w.on("error",function(e){N.handleError(e)});else{T.url=w.headers.location;var s=Url.parse(T.url);n=s.hostname;var r={hostname:s.hostname,port:s.port,path:s.path,method:303===w.statusCode?"GET":T.method,headers:D,withCredentials:N.withCredentials};(S=u(r,e).on("error",c)).end()}}).on("error",c),e&&S.write(e),S.end(),N.dispatchEvent("loadstart")}else{var f=".node-xmlhttprequest-content-"+process.pid,l=".node-xmlhttprequest-sync-"+process.pid;fs.writeFileSync(l,"","utf8");for(var p="var http = require(\'http\'), https = require(\'https\'), fs = require(\'fs\');var doRequest = http"+(t?"s":"")+".request;var options = "+JSON.stringify(d)+";var responseText = \'\';var req = doRequest(options, function(response) {response.setEncoding(\'utf8\');response.on(\'data\', function(chunk) {  responseText += chunk;});response.on(\'end\', function() {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: null, data: {statusCode: response.statusCode, headers: response.headers, text: responseText}}), \'utf8\');fs.unlinkSync(\'"+l+"\');});response.on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});}).on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});"+(e?"req.write(\'"+JSON.stringify(e).slice(1,-1).replace(/\'/g,"\\\'")+"\');":"")+"req.end();",E=spawn(process.argv[0],["-e",p]);fs.existsSync(l););var y=JSON.parse(fs.readFileSync(f,"utf8"));E.stdin.end(),fs.unlinkSync(f),y.err?N.handleError(y.err):(w=y.data,N.status=y.data.statusCode,N.responseText=y.data.text,L(N.DONE))}}},this.handleError=function(e){this.status=0,this.statusText=e,this.responseText=e.stack,q=!0,L(this.DONE),this.dispatchEvent("error")},this.abort=function(){S&&(S.abort(),S=null),D=C,this.status=0,this.responseText="",this.responseXML="",q=!0,this.readyState===this.UNSENT||this.readyState===this.OPENED&&!R||this.readyState===this.DONE||(R=!1,L(this.DONE)),this.readyState=this.UNSENT,this.dispatchEvent("abort")},this.addEventListener=function(e,t){e in n||(n[e]=[]),n[e].push(t)},this.removeEventListener=function(e,t){e in n&&(n[e]=n[e].filter(function(e){return e!==t}))},this.dispatchEvent=function(e){if("function"==typeof N["on"+e]&&N["on"+e](),e in n)for(var t=0,s=n[e].length;t<s;t++)n[e][t].call(N)};var L=function(e){e!=N.LOADING&&N.readyState===e||(N.readyState=e,(T.async||N.readyState<N.OPENED||N.readyState===N.DONE)&&N.dispatchEvent("readystatechange"),N.readyState!==N.DONE||q||(N.dispatchEvent("load"),N.dispatchEvent("loadend")))}};';
     private static var _isXMLHttpRequestInit: Bool = false;
 
     private static function initXMLHttpRequest(): Void {

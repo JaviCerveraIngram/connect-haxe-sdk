@@ -1,5 +1,6 @@
 package connect;
 
+import connect.api.ConnectHelper;
 import connect.api.IApiClient;
 import connect.api.IFulfillmentApi;
 import connect.api.IUsageApi;
@@ -22,7 +23,7 @@ import connect.api.impl.GeneralApiImpl;
     the `connect.api.IApiClient` interface.
 
     Since these dependencies must be globally available, the `Env` class contains static
-    method to obtain the default instances of these clases from anywhere. To minimize the
+    methods to obtain the default instances of these classes from anywhere. To minimize the
     side-effects that can be caused by changes in the values of global objects in a program,
     all environment objects are immutable, providing a side-effect free context for the program
     to run.
@@ -32,12 +33,15 @@ import connect.api.impl.GeneralApiImpl;
     `Env.initConfig` or `Env.loadConfig` can be provided at the top of the program.
     Otherwise, the configuration will be automatically loaded from the "config.json" file.
 
+    Likewise, the `Logger` can be initialized with a call to `Env.initLogger`, assuming it has not
+    been done yet.
+
     Many of the objects returned by this class are defined in a public interface, with a default
     implementation provided by the environment. This is because when unit testing, these classes
     get replaced through dependency injection by mocked ones, allowing to a sandboxed unit testing
     environment.
 **/
-class Env {
+class Env extends Base {
     /**
         Initializes the configuration object. It must have not been previously configured.
 
@@ -66,18 +70,16 @@ class Env {
     **/
     public static function loadConfig(filename: String): Void {
         if (config == null) {
-            var content = sys.io.File.getContent(filename);
-            var dict = Dictionary.fromObject(haxe.Json.parse(content));
-            var apiUrl = dict.get('apiEndpoint');
-            var apiKey = dict.get('apiKey');
-            var products: Collection<String> = null;
-            switch (Type.typeof(dict.get('products'))) {
-                case TClass(String):
-                    products = Collection._fromArray([dict.getString('products')]);
-                case TClass(Collection):
-                    products = dict.get('products');
-                default:
-            }
+            final content = sys.io.File.getContent(filename);
+            final dict = Dictionary.fromObject(haxe.Json.parse(content));
+            final apiUrl = dict.get('apiEndpoint');
+            final apiKey = dict.get('apiKey');
+            final configProducts: Dynamic = dict.get('products');
+            final products: Collection<String> = Std.is(configProducts, Collection)
+                ? configProducts
+                : Std.is(configProducts, String)
+                ? Collection._fromArray([configProducts])
+                : null;
             dict.remove('apiEndpoint');
             dict.remove('apiKey');
             dict.remove('products');
@@ -99,19 +101,21 @@ class Env {
     /**
         Initializes the logger. It must have not been previously configured.
 
-        @param filename Name of the file (can include path) where the log will the stored.
-            Use `null` to only write to standard output.
+        @param path Path where logs will be stored.
         @param level Level of log.
             One of: `Logger.LEVEL_ERROR`, `Logger.LEVEL_INFO`, `Logger.LEVEL_DEBUG`.
-        @param writer The logger writer. Pass `null` to use the default writer, or if you
-            need to write logs in a custom way, create a class that extends `LoggerWriter`,
-            override the required methods (usually `writeLine`), and pass an instance of the
-            class here.
+        @param writer The logger writer. Pass `null` to use the default file writer,
+            or create your own writer class that implements the `ILoggerWriter` interface
+            and pass an instance here.
+        @param formatter The logger formatter. Pass `null` to use the default Markdown formatter,
+            or create your own formatter class that implements the `ILoggerFormatter` interface
+            and pass an instance here.
         @throws String If the logger is already initialized.
     **/
-    public static function initLogger(filename: String, level: Int, writer: LoggerWriter) {
+    public static function initLogger(path: String, level: Int, writer: ILoggerWriter,
+            formatter: ILoggerFormatter): Void {
         if (logger == null) {
-            logger = new Logger(filename, level, writer);
+            logger = new Logger(path, level, writer, formatter);
         } else {
             throw "Logger instance is already initialized.";
         }
@@ -150,7 +154,7 @@ class Env {
     **/
     public static function getLogger(): Logger {
         if (!isLoggerInitialized()) {
-            initLogger('log.md', Logger.LEVEL_INFO, null);
+            initLogger('logs', Logger.LEVEL_INFO, null, null);
         }
         return logger;
     }
@@ -170,9 +174,10 @@ class Env {
 
     /**
         @returns The Fulfillment API instance, used to make all fulfillment requests to the
-            platform.
+        platform.
         @throws String If a class implementing the IFulfillmentApi interface cannot be instanced.
     **/
+    @:dox(hide)
     public static function getFulfillmentApi() : IFulfillmentApi {
         if (fulfillmentApi == null) {
             fulfillmentApi = createInstance('IFulfillmentApi');
@@ -185,6 +190,7 @@ class Env {
         @returns The Usage API instance, used to make all usage requests to the platform.
         @throws String If a class implementing the IUsageApi interface cannot be instanced.
     **/
+    @:dox(hide)
     public static function getUsageApi() : IUsageApi {
         if (usageApi == null) {
             usageApi = createInstance('IUsageApi');
@@ -197,6 +203,7 @@ class Env {
         @returns The Tier API instance, used to make all tier requests to the platform.
         @throws String If a class implementing the ITierApi interface cannot be instanced.
     **/
+    @:dox(hide)
     public static function getTierApi() : ITierApi {
         if (tierApi == null) {
             tierApi = createInstance('ITierApi');
@@ -209,6 +216,7 @@ class Env {
         @returns The General API instance, used to make all general requests to the platform.
         @throws String If a class implementing the IGeneralApi interface cannot be instanced.
     **/
+    @:dox(hide)
     public static function getGeneralApi() : IGeneralApi {
         if (generalApi == null) {
             generalApi = createInstance('IGeneralApi');
@@ -247,7 +255,7 @@ class Env {
         if (dependencies == null) {
             dependencies = new Dictionary();
             if (deps != null) {
-                var keys = deps.keys();
+                final keys = deps.keys();
                 for (key in keys) {
                     if (defaultDependencies.exists(key)) {
                         dependencies.setString(key, deps.getString(key));
@@ -272,10 +280,10 @@ class Env {
 
     private static function createInstance(interfaceName: String): Dynamic {
         init();
-        var className = (dependencies.exists(interfaceName))
+        final className = (dependencies.exists(interfaceName))
             ? dependencies.getString(interfaceName)
             : defaultDependencies.getString(interfaceName);
-        var classObj = Type.resolveClass(className);
+        final classObj = Type.resolveClass(className);
         if (classObj != null) {
             return Type.createInstance(classObj, []);
         } else {

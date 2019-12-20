@@ -9,6 +9,7 @@ import connect.models.Activation;
 import connect.models.Agreement;
 import connect.models.AgreementStats;
 import connect.models.Asset;
+import connect.models.AssetRequest;
 import connect.models.Category;
 import connect.models.Choice;
 import connect.models.Configuration;
@@ -43,10 +44,14 @@ import connect.models.ProductConfigurationParam;
 import connect.models.ProductStats;
 import connect.models.ProductStatsInfo;
 import connect.models.Renewal;
-import connect.models.Request;
 import connect.models.Template;
 import connect.models.TierAccount;
+import connect.models.TierConfig;
+import connect.models.TierConfigRequest;
 import connect.models.Tiers;
+import connect.models.UsageFile;
+import connect.models.UsageRecord;
+import connect.models.UsageRecords;
 import connect.models.User;
 #end
 
@@ -64,7 +69,7 @@ class Packager {
     }
 
 #if packager
-    private static inline var EOL = '\r\n';
+    private static final EOL = '\r\n';
 
     private static function getClassNames(): Array<String> {
         var xmlContent = sys.io.File.getContent('_build/connect.xml');
@@ -124,6 +129,7 @@ class Packager {
         createPath('_packages/connect.java');
         copyLicense('_packages/connect.java');
         sys.io.File.copy('_build/java/Packager.jar', '_packages/connect.java/connect.jar');
+        sys.io.File.copy('stuff/pom.xml', '_packages/connect.java/pom.xml');
     }
 
 
@@ -215,8 +221,15 @@ class Packager {
             }
             file.writeString(EOL + EOL);
 
+            if (pkg == 'connect') {
+                file.writeString('SYNCREQUEST_PATH = \'connect.autogen.connect_api_impl_ApiClientImpl.syncRequest\'' + EOL + EOL);
+            }
+
             // Write __all__
             file.writeString('__all__ = [' + EOL);
+            if (pkg == 'connect') {
+                file.writeString('    \'SYNCREQUEST_PATH\',' + EOL);
+            }
             for (cls in pkgClasses) {
                 file.writeString('    \'${cls}\',' + EOL);
             }

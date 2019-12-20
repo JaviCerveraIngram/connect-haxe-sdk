@@ -1,6 +1,6 @@
 package connect.models;
 
-import connect.api.QueryParams;
+import connect.api.Query;
 
 
 /**
@@ -31,8 +31,8 @@ class Category extends IdModel {
 
         @returns A Collection of Categories.
     **/
-    public static function list(filters: QueryParams) : Collection<Category> {
-        var categories = Env.getGeneralApi().listCategories(filters);
+    public static function list(filters: Query) : Collection<Category> {
+        final categories = Env.getGeneralApi().listCategories(filters);
         return Model.parseArray(Category, categories);
     }
 
@@ -40,7 +40,7 @@ class Category extends IdModel {
     /** @returns The Category with the given id, or `null` if it was not found. **/
     public static function get(id: String): Category {
         try {
-            var category = Env.getGeneralApi().getCategory(id);
+            final category = Env.getGeneralApi().getCategory(id);
             return Model.parse(Category, category);
         } catch (ex: Dynamic) {
             return null;
