@@ -7,7 +7,7 @@ hxml:
 
 before_install:
   - javac -version
-  - sudo apt install openjdk-8-jdk-headless -y
+  - sudo apt install openjdk-8-jdk -y
   - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
 #  - curl -s "https://get.sdkman.io" | bash
 #  - source "/home/travis/.sdkman/bin/sdkman-init.sh"
