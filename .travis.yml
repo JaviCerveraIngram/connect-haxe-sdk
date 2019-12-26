@@ -7,7 +7,9 @@ hxml:
 
 before_install:
   - javac -version
-  - sudo apt install openjdk-8-jdk -y
+#  - sudo apt install openjdk-8-jdk -y
+  - curl -s "https://get.sdkman.io" | bash
+  - sdk install java 8.0.222.j9-adpt
   - javac -version
 
 after_success:
