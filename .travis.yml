@@ -6,7 +6,9 @@ hxml:
   - doc.hxml
 
 before_install:
+  - javac -version
   - sudo apt install openjdk-8-jdk -y
+  - javac -version
 
 after_success:
   - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$doc_token -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
