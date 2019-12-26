@@ -6,16 +6,11 @@ hxml:
   - doc.hxml
 
 before_install:
-  - javac -version
 #  - sudo apt install openjdk-8-jdk -y
 #  - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
   - curl -s "https://get.sdkman.io" | bash
   - source "/home/travis/.sdkman/bin/sdkman-init.sh"
   - sdk install java 8.0.232.j9-adpt
-  - javac -version
-
-after_success:
-  - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$doc_token -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
 
 deploy:
   provider: pages
@@ -24,4 +19,7 @@ deploy:
   skip_cleanup: true
   keep_history: false
   on:
-    branch: master
+    branch: CUSDK-48-maven-deployment
+
+after_deploy:
+  - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$doc_token -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
