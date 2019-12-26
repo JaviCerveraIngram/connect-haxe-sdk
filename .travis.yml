@@ -10,7 +10,7 @@ before_install:
 #  - sudo apt install openjdk-8-jdk -y
   - curl -s "https://get.sdkman.io" | bash
   - source "/home/travis/.sdkman/bin/sdkman-init.sh"
-  - sdk install java 8.0.222.j9-adpt
+  - sdk install java 8.0.232.j9-adpt
   - javac -version
 
 after_success:
