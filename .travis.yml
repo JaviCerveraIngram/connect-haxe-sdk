@@ -1,5 +1,7 @@
-language: haxe
+language: java
 jdk: oraclejdk8
+
+language: haxe
 haxe: "4.0.5"
 hxml:
   - unittests.hxml
