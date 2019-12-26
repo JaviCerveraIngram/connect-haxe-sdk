@@ -5,7 +5,7 @@ hxml:
   - package.hxml
   - doc.hxml
 
-before-install:
+before_install:
   - sudo apt install openjdk-8-jdk -y
 
 after_success:
