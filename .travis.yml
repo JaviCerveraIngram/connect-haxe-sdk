@@ -11,7 +11,7 @@ before_install:
 #  - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
   - curl -s "https://get.sdkman.io" | bash
   - source "/home/travis/.sdkman/bin/sdkman-init.sh"
-  - sdk install java 8
+  - sdk install java 8.0.232.j9-adpt
   - javac -version
 
 after_success:
