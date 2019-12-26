@@ -1,12 +1,12 @@
-language: java
-jdk: oraclejdk8
-
 language: haxe
 haxe: "4.0.5"
 hxml:
   - unittests.hxml
   - package.hxml
   - doc.hxml
+
+before-install:
+  - sudo apt install openjdk-8-jdk -y
 
 after_success:
   - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$doc_token -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
