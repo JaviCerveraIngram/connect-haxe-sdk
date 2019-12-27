@@ -35,9 +35,8 @@
 
     <distributionManagement>
         <repository>
-            <id>nexus</id>
-            <name>Release</name>
-            <url>http://nexus.spc.dev.cloud.im:8081/repository/maven-releases/</url>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk</url>
         </repository>
     </distributionManagement>
 </project>
