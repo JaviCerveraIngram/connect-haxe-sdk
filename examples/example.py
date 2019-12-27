@@ -1,3 +1,6 @@
+# This file is part of the Ingram Micro CloudBlue Connect SDK.
+# Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+
 from connect import Env
 from connect import Flow
 from connect import Processor
@@ -37,6 +40,6 @@ if __name__ == '__main__':
     # Process requests
     Processor() \
         .flow(flow) \
-        .processRequests(Query() \
+        .processAssetRequests(Query() \
             .equal('asset.product.id__in', Env.getConfig().getProductsString()) \
             .equal('status', 'pending'))

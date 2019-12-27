@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package tests.unit;
 
 import connect.Collection;
@@ -61,7 +65,7 @@ class AccountTest extends haxe.unit.TestCase {
         assertTrue(Std.is(account.events, Events));
         assertTrue(Std.is(account.events.created, Event));
         assertEquals('VA-044-420', account.id);
-        assertEquals('2018-06-04T13:19:10+00:00', account.events.created.at);
+        assertEquals('2018-06-04T13:19:10+00:00', account.events.created.at.toString());
         assertEquals(null, account.events.created.by);
         assertEquals(null, account.events.inquired);
         assertEquals(null, account.events.pended);

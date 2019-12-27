@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.logger;
 
 
@@ -52,7 +56,7 @@ class Logger extends Base {
         final fullname = (this.path != null && filename != null)
             ? this.path + filename
             : null;
-        final setFilenameResult = F.reduce(this.outputs, function(last, o, _, __) {
+        final setFilenameResult = Lambda.fold(this.outputs, function(o, last) {
             return last && o.writer.setFilename(fullname);
         }, true);
         if (setFilenameResult && fullname != null) {

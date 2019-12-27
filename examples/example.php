@@ -1,4 +1,8 @@
 <?php
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 
 require_once '../_packages/connect.php/connect.php';
 
@@ -38,6 +42,6 @@ $flow = (new Flow(null))
 // Process requests
 (new Processor())
     ->flow($flow)
-    ->processRequests((new Query())
+    ->processAssetRequests((new Query())
         ->equal('asset.product.id__in', Env::getConfig()->getProductsString())
         ->equal('status', 'pending'));

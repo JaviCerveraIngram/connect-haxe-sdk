@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 
@@ -15,14 +19,14 @@ class Agreement extends IdModel {
 
 
     /** Date of creation of the agreement. **/
-    public var created: String;
+    public var created: DateTime;
 
 
     /**
         Date of the update of the agreement. It can be creation
         of the new version, change of the field, etc. (any change).
     **/
-    public var updated: String;
+    public var updated: DateTime;
 
 
     /** Reference to the owner account object. **/
@@ -50,7 +54,7 @@ class Agreement extends IdModel {
 
 
     /** Date of the creation of the version. **/
-    public var versionCreated: String;
+    public var versionCreated: DateTime;
 
 
     /** Number of contracts this version has. **/
@@ -79,9 +83,12 @@ class Agreement extends IdModel {
     public function new() {
         super();
         this._setFieldClassNames([
+            'created' => 'DateTime',
+            'updated' => 'DateTime',
             'owner' => 'Account',
             'stats' => 'AgreementStats',
             'author' => 'User',
+            'versionCreated' => 'DateTime',
             'parent' => 'Agreement'
         ]);
     }

@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 
@@ -14,5 +18,12 @@ class Activation extends Model {
 
 
     /** Activation date. **/
-    public var date: String;
+    public var date: DateTime;
+
+    public function new() {
+        super();
+        this._setFieldClassNames([
+            'date' => 'DateTime',
+        ]);
+    }
 }

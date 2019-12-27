@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 
@@ -6,7 +10,7 @@ package connect.models;
 **/
 class Event extends Model {
     /** Date when the event occurred. **/
-    public var at: String;
+    public var at: DateTime;
 
 
     /** User that caused the event. **/
@@ -16,6 +20,7 @@ class Event extends Model {
     public function new() {
         super();
         this._setFieldClassNames([
+            'at' => 'DateTime',
             'by' => 'User'
         ]);
     }

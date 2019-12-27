@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 
@@ -34,14 +38,15 @@ class Connection extends IdModel {
     public var status: String;
 
 
-    public var createdAt: String;
+    public var createdAt: DateTime;
 
 
     public function new() {
         super();
         this._setFieldClassNames([
             'provider' => 'Account',
-            'vendor' => 'Account'
+            'vendor' => 'Account',
+            'createdAt' => 'DateTime',
         ]);
     }
 }

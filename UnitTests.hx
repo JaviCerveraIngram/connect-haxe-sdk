@@ -1,3 +1,8 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
+
 // Include all mock classes here to make sure they are accesible to reflection
 import tests.mocks.ApiClientMock;
 import tests.mocks.FulfillmentApiMock;
@@ -16,6 +21,7 @@ class UnitTests {
         runner.add(new tests.unit.CategoryTest());
         runner.add(new tests.unit.ConfigurationTest());
         runner.add(new tests.unit.ConversationTest());
+        runner.add(new tests.unit.DateTimeTest());
         runner.add(new tests.unit.DiffTest());
         runner.add(new tests.unit.ItemTest());
         runner.add(new tests.unit.MarkdownLoggerFormatterTest());

@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 import connect.api.Query;
@@ -15,7 +19,7 @@ class Conversation extends IdModel {
 
 
     /** Date of the Conversation creation. **/
-    public var created: String;
+    public var created: DateTime;
 
 
     /** Conversation topic. **/
@@ -87,6 +91,7 @@ class Conversation extends IdModel {
     public function new() {
         super();
         this._setFieldClassNames([
+            'created' => 'DateTime',
             'creator' => 'User'
         ]);
     }

@@ -1,3 +1,8 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
+
 import connect.Env;
 import connect.Flow;
 import connect.Processor;
@@ -36,7 +41,7 @@ public class Example {
         // Process requests
         new Processor()
             .flow(flow)
-            .processRequests(new Query()
+            .processAssetRequests(new Query()
                 .equal("asset.product.id__in", Env.getConfig().getProductsString())
                 .equal("status", "pending"));
     }

@@ -1,3 +1,7 @@
+/*
+    This file is part of the Ingram Micro CloudBlue Connect SDK.
+    Copyright (c) 2019 Ingram Micro. All Rights Reserved.
+*/
 package connect.models;
 
 import connect.api.Query;
@@ -33,7 +37,7 @@ class Product extends IdModel {
 
 
     /** Date of publishing. **/
-    public var publishedAt: String;
+    public var publishedAt: DateTime;
 
 
     /** Product configurations. **/
@@ -438,6 +442,7 @@ class Product extends IdModel {
     public function new() {
         super();
         this._setFieldClassNames([
+            'publishedAt' => 'DateTime',
             'owner' => 'Account',
             'stats' => 'ProductStats'
         ]);
