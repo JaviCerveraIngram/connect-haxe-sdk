@@ -13,7 +13,8 @@ before_install:
   - sdk install java 8.0.232.j9-adpt
 #  - sdk install maven 3.6.3
   - sudo apt install maven -y
-  - cat ~/.m2/settings.xml
+#  - cat ~/.m2/settings.xml
+  - rm ~/.m2/settings.xml
 
 deploy:
   provider: pages
