@@ -11,8 +11,8 @@ before_install:
   - curl -s "https://get.sdkman.io" | bash
   - source "/home/travis/.sdkman/bin/sdkman-init.sh"
   - sdk install java 8.0.232.j9-adpt
-#  - sdk install maven 3.6.3
-  - sudo apt install maven -y
+  - sdk install maven 3.6.3
+#  - sudo apt install maven -y
   - cp stuff/settings.xml ~/.m2/settings.xml
   - sed -i "s/__TOKEN__/${mvn_token}/g" ~/.m2/settings.xml
 
