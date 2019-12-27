@@ -1,0 +1,9 @@
+<settings>
+    <servers>
+        <server>
+            <id>github</id>
+            <username>JaviCerveraIngram</username>
+            <password>$mvn_token</password>
+        </server>
+    </servers>
+</settings>
