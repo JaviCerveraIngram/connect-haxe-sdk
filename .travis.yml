@@ -10,9 +10,9 @@ before_install:
 #  - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
   - curl -s "https://get.sdkman.io" | bash
   - source "/home/travis/.sdkman/bin/sdkman-init.sh"
-  - sdk install java 8.0.232.j9-adpt
-  - sdk install maven 3.6.3
-#  - sudo apt install maven -y
+#  - sdk install java 8.0.232.j9-adpt
+#  - sdk install maven 3.6.3
+  - sudo apt install maven -y
 
 deploy:
   provider: pages
@@ -24,4 +24,4 @@ deploy:
     branch: CUSDK-48-maven-deployment
 
 after_deploy:
-  - mvn -e deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$mvn_token -Durl=https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
+  - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$mvn_token -Durl=https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
