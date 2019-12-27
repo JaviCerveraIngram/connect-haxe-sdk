@@ -14,7 +14,7 @@ before_install:
 #  - sdk install maven 3.6.3
   - sudo apt install maven -y
   - cp stuff/settings.xml ~/.m2/settings.xml
-  - sed -i "s/__TOKEN__/BLA${mvn_token}BLA/g" ~/.m2/settings.xml
+  - sed -i "s/__TOKEN__/${mvn_token}/g" ~/.m2/settings.xml
   - cat ~/.m2/settings.xml
 
 deploy:

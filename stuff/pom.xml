@@ -21,6 +21,14 @@
             <plugin>
                 <artifactId>maven-deploy-plugin</artifactId>
                 <version>${maven-deploy-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <configuration>
+                            <repositoryId>github</repositoryId>
+                            <file>connect.jar</file>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -28,7 +36,12 @@
     <distributionManagement>
         <repository>
             <id>github</id>
+            <name>Release</name>
             <url>https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk</url>
         </repository>
     </distributionManagement>
+
+    <scm>
+        <url>https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk</url>
+    </scm>
 </project>
