@@ -27,4 +27,4 @@ deploy:
     branch: CUSDK-48-maven-deployment
 
 after_deploy:
-  - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$mvn_token -Durl=https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
+  - mvn deploy:deploy-file -Dregistry=https://maven.pkg.github.com/JaviCerveraIngram -Dtoken=$mvn_token -DrepositoryId=github -Durl=https://maven.pkg.github.com/JaviCerveraIngram/connect-haxe-sdk -DpomFile=stuff/pom.xml -Dfile=_build/java/Packager.jar
