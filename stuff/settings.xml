@@ -3,7 +3,7 @@
         <server>
             <id>github</id>
             <username>JaviCerveraIngram</username>
-            <password>$mvn_token</password>
+            <password>__TOKEN__</password>
         </server>
     </servers>
 </settings>
