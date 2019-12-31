@@ -16,6 +16,12 @@ before_install:
   - cp stuff/settings.xml ~/.m2/settings.xml
   - sed -i "s/__TOKEN__/${mvn_token}/g" ~/.m2/settings.xml
 
+before_script:
+  - ./stuff/before_script.sh
+
+after_script:
+  - ./stuff/after_script.sh
+
 deploy:
   provider: pages
   local_dir: doc
