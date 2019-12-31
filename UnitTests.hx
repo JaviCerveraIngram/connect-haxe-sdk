@@ -23,6 +23,7 @@ class UnitTests {
         runner.add(new tests.unit.ConversationTest());
         runner.add(new tests.unit.DateTimeTest());
         runner.add(new tests.unit.DiffTest());
+        runner.add(new tests.unit.FlowTest());
         runner.add(new tests.unit.ItemTest());
         runner.add(new tests.unit.MarkdownLoggerFormatterTest());
         runner.add(new tests.unit.ProductTest());
