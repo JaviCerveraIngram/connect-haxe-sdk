@@ -151,6 +151,8 @@ class Packager {
     private static function createJSPackage(classes: Array<String>): Void {
         final outDir = '_build/js';
         copyLicense(outDir);
+        sys.io.File.copy('stuff/JS_README.md', '$outDir/README.md');
+        sys.io.File.copy('stuff/package.json', '$outDir/package.json');
 
         // Get list of packages
         final packages = getPackages(classes).map(function(pkg) {

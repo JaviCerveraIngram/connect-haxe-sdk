@@ -23,7 +23,7 @@ deploy:
   skip_cleanup: true
   keep_history: false
   on:
-    branch: master
+    branch: CUSDK-57-npm-deployment
 
 after_deploy:
 # Deploy to Maven Central
@@ -31,5 +31,11 @@ after_deploy:
   - gpg --batch --passphrase ${mvn_passphrase} --import stuff/key.gpg
   - rm stuff/key.gpg
   - python3 stuff/deploy_maven_central.py
+# Deploy to npm
+  - cp stuff/npmrc ~/.npmrc
+  - sed -i "s/__TOKEN__/${npm_token}/g" ~/.npmrc
+  - cd _build/js
+  - npm publish
+  - cd ../..
 # Deploy to PyPI
   - "./stuff/deploy_pypi.sh"

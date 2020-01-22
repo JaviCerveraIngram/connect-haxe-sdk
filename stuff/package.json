@@ -1,0 +1,29 @@
+{
+  "name": "connect-sdk-haxe-port",
+  "version": "18.0.0",
+  "description": "CloudBlue Connect SDK, generated from Haxe",
+  "main": "connect.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudblue/connect-haxe-sdk.git"
+  },
+  "keywords": [
+    "connect",
+    "sdk",
+    "cloudblue",
+    "ingram",
+    "micro",
+    "ingrammicro",
+    "cloud",
+    "automation"
+  ],
+  "author": "Ingram Micro <connect-service-account@ingrammicro.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/cloudblue/connect-haxe-sdk/issues"
+  },
+  "homepage": "https://github.com/cloudblue/connect-haxe-sdk#readme"
+}
