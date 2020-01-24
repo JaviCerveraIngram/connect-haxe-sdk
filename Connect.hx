@@ -67,7 +67,7 @@ class Connect {
         final version = StringTools.trim(sys.io.File.getContent('VERSION'));
         final classes = getClassNames();
         createJavaPackage(version);
-        createJsPackage(classes);
+        createJsPackage(version, classes);
         createPhpPackage(classes);
         createPythonPackage(version, classes);
     #elseif js
@@ -110,11 +110,13 @@ class Connect {
     }
 
 
-    private static function createJsPackage(classes: Array<String>): Void {
+    private static function createJsPackage(version: String, classes: Array<String>): Void {
         final outDir = '_build/js';
         copyLicense(outDir);
         sys.io.File.copy('stuff/JS_README.md', '$outDir/README.md');
-        sys.io.File.copy('stuff/package.json', '$outDir/package.json');
+        final packageJson = sys.io.File.getContent('stuff/package.json');
+        final fixedPackageJson = StringTools.replace(pom, '__VERSION__', version);
+        sys.io.File.saveContent('$outDir/package.json', fixedPackageJson);
 
         // Get list of packages
         final packages = getPackages(classes).map(function(pkg) {
