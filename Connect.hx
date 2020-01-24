@@ -115,7 +115,7 @@ class Connect {
         copyLicense(outDir);
         sys.io.File.copy('stuff/JS_README.md', '$outDir/README.md');
         final packageJson = sys.io.File.getContent('stuff/package.json');
-        final fixedPackageJson = StringTools.replace(pom, '__VERSION__', version);
+        final fixedPackageJson = StringTools.replace(packageJson, '__VERSION__', version);
         sys.io.File.saveContent('$outDir/package.json', fixedPackageJson);
 
         // Get list of packages
