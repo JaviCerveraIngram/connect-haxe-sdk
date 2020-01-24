@@ -1,6 +1,6 @@
 {
   "name": "connect-sdk-haxe-port",
-  "version": "18.0.0",
+  "version": "__VERSION__",
   "description": "CloudBlue Connect SDK, generated from Haxe",
   "main": "connect.js",
   "scripts": {

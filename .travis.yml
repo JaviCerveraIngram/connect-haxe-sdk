@@ -39,6 +39,7 @@ after_deploy:
   - "*** Deploying to npm..."
   - cp stuff/npmrc ~/.npmrc
   - sed -i "s/__TOKEN__/${npm_token}/g" ~/.npmrc
+  - sed -i "s/__VERSION__/${npm_token}/g" stuff/package.json
   - cd _build/js
   - npm publish
   - cd ../..
