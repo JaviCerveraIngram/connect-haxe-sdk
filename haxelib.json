@@ -1,0 +1,10 @@
+{
+    "name": "connectsdk",
+    "version": "19.0.5",
+    "url": "https://github.com/cloudblue/connect-haxe-sdk",
+    "tags": ["connect", "sdk", "cloudblue", "ingram", "micro", "ingrammicro", "cloud", "automation"],
+    "license": "Apache",
+    "contributors": ["JaviCerveraIngram"],
+    "releasenote": "Initial release.",
+    "classPath": "connect/"
+}
