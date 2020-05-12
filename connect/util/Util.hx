@@ -3,20 +3,40 @@
     Copyright (c) 2019 Ingram Micro. All Rights Reserved.
 */
 package connect.util;
+
 import connect.Env;
+import connect.logger.Logger;
+
+
 @:dox(hide)
 class Util {
+
+    /**
+     * Given a list of regex search all in a string and hide this values
+     * @param text 
+     * @param regExData 
+     */
+    public static function replaceStrSensitiveData(text:String,regExData:Collection<EReg>):String {
+        for (regEx in regExData){
+            while(regEx.match(text)){
+                text = StringTools.replace(text,regEx.matched(1),StringTools.lpad("","*",9));
+            }
+        }
+        return text;
+    }
+
+
     /*
         If the text contains a JSON string representation, it returns it beautified using two space
         indentation. Otherwise, returns the string as-is. If `compact` is `true` and the text
         contains a JSON string representation, only the id is returned or a string with all the
         fields if it does not have an id.
     */
-    public static function beautify(text:String, compact:Bool):String {
+    public static function beautify(text:String, compact:Bool, masked: Bool):String {
         try {
-            return beautifyObject(haxe.Json.parse(text), compact);
+            return beautifyObject(haxe.Json.parse(text), compact, masked);
         } catch (ex:Dynamic) {
-            return text;
+           return replaceStrSensitiveData(text,Env.getLogger().getRegExMaskingList());
         }
     }
 
@@ -26,12 +46,29 @@ class Util {
         If `compact` is `true` and the text contains a JSON string representation, only the id
         is returned or a string with all the fields if it does not have an id.
     */
-    public static function beautifyObject(obj:Dynamic, compact:Bool):String {
+    public static function beautifyObject(obj:Dynamic, compact:Bool, masked:Bool):String {
         if (compact) {
-            return haxe.Json.stringify(maskFields(obj), null, '  ');
-
+            if (Type.typeof(obj) == TObject) {
+                // Json contains an object
+                if (Reflect.hasField(obj, 'id')) {
+                    return obj.id;
+                } else {
+                    return '{ ' + Reflect.fields(obj).join(', ') + ' }';
+                }
+            } else {
+                // Json contains an array
+                final arr: Array<Dynamic> = obj;
+                final mapped = arr.map(function(el) {
+                    return Reflect.hasField(el, 'id')
+                        ? el.id
+                        : (Type.typeof(el) == TObject)
+                        ? '{ ' + Reflect.fields(el).join(', ') + ' }'
+                        : Std.string(el);
+                });
+                return haxe.Json.stringify(mapped, null, '  ');
+            }
         } else {
-            return haxe.Json.stringify(obj, null, '  ');
+            return haxe.Json.stringify(masked ? maskFields(obj) : obj, null, '  ');
         }
     }
 

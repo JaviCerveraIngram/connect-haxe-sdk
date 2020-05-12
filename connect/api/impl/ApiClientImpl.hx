@@ -255,8 +255,8 @@ class ApiClientImpl extends Base implements IApiClient {
     private static function logRequest(level: Int, method: String, url: String,
             headers: Dictionary, body: String, response: Response): Void {
         final firstMessage = 'Http ${method.toUpperCase()} request to ${url}';
-        for (output in Env.getLogger().getOutputs()) {
-            final fmt = output.formatter;
+        for (handler in Env.getLogger().getHandlers()) {
+            final fmt = handler.formatter;
             final requestList = new Collection<String>();
             if (headers != null) {
                 requestList.push('Headers:${getHeadersTable(headers, fmt)}');
@@ -272,8 +272,8 @@ class ApiClientImpl extends Base implements IApiClient {
             }
             Env.getLogger()._writeToHandler(
                 level,
-                fmt.formatBlock('$firstMessage${fmt.formatList(requestList)}'),
-                output);
+                fmt.formatBlock(level,'$firstMessage${fmt.formatList(level,requestList)}'),
+                handler);
         }
     }
 
@@ -292,7 +292,7 @@ class ApiClientImpl extends Base implements IApiClient {
                     .push(fixedHeaders.get(key))
             );
         });
-        return fmt.formatTable(headersCol);
+        return fmt.formatTable(Env.getLogger().getLevel(),headersCol);
     }
 
 
@@ -322,7 +322,13 @@ class ApiClientImpl extends Base implements IApiClient {
         final compact = Env.getLogger().getLevel() != Logger.LEVEL_DEBUG;
         if (Util.isJson(data)) {
             final prefix = compact ? '$title (compact):' : '$title:';
-            final block = fmt.formatCodeBlock(Util.beautify(data, compact), 'json');
+            final block = fmt.formatCodeBlock(
+                Env.getLogger().getLevel(),
+                Util.beautify(
+                    data,
+                    Env.getLogger().isCompact(),
+                    Env.getLogger().getLevel() != Logger.LEVEL_DEBUG),
+                'json');
             return '$prefix $block';
         } else {
             final fixedBody = compact

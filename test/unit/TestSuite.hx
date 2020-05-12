@@ -10,13 +10,16 @@ import ConversationTest;
 import TierAccountTest;
 import LoggerTest;
 import AssetRequestTest;
+import FlowAttemptsTest;
 import ModelTest;
 import DateTimeTest;
 import ItemTest;
+import FlowTest;
 import AccountTest;
 import MarkdownLoggerFormatterTest;
 import ConfigurationTest;
 import AgreementTest;
+import CustomLoggerFormatterTest;
 import ListingTest;
 import AssetTest;
 import CategoryTest;
@@ -30,32 +33,35 @@ import ConfigTest;
  */
 class TestSuite extends massive.munit.TestSuite
 {
-	public function new()
-	{
-		super();
+    public function new()
+    {
+        super();
 
-		add(TierConfigTest);
-		add(DiffTest);
-		add(MarketplaceTest);
-		add(TierConfigRequestTest);
-		add(QueryTest);
-		add(UsageFileTest);
-		add(ConversationTest);
-		add(TierAccountTest);
-		add(LoggerTest);
-		add(AssetRequestTest);
-		add(ModelTest);
-		add(DateTimeTest);
-		add(ItemTest);
-		add(AccountTest);
-		add(MarkdownLoggerFormatterTest);
-		add(ConfigurationTest);
-		add(AgreementTest);
-		add(ListingTest);
-		add(AssetTest);
-		add(CategoryTest);
-		add(ProductTest);
-		add(ListingRequestTest);
-		add(ConfigTest);
-	}
+        add(TierConfigTest);
+        add(DiffTest);
+        add(MarketplaceTest);
+        add(TierConfigRequestTest);
+        add(QueryTest);
+        add(UsageFileTest);
+        add(ConversationTest);
+        add(TierAccountTest);
+        add(LoggerTest);
+        add(AssetRequestTest);
+        add(FlowAttemptsTest);
+        add(ModelTest);
+        add(DateTimeTest);
+        add(ItemTest);
+        add(FlowTest);
+        add(AccountTest);
+        add(MarkdownLoggerFormatterTest);
+        add(ConfigurationTest);
+        add(AgreementTest);
+        add(CustomLoggerFormatterTest);
+        add(ListingTest);
+        add(AssetTest);
+        add(CategoryTest);
+        add(ProductTest);
+        add(ListingRequestTest);
+        add(ConfigTest);
+    }
 }
