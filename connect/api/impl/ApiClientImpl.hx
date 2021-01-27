@@ -17,23 +17,31 @@ import haxe.io.BytesInput;
 
 class ApiClientImpl extends Base implements IApiClient {
     public function syncRequest(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+        fileArg: String, fileName: String, fileContent: Blob, certificate:String, ?logLevel: Null<Int> = null) : Response {
+            return this.syncRequestWithLogger(method, url, headers, body,
+                fileArg, fileName, fileContent, certificate,Env.getLogger(), logLevel);
+        }
+
+    public function syncRequestWithLogger(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob, certificate:String,logger:Logger, ?logLevel: Null<Int> = null) : Response {
     #if cs
-        final response = syncRequestCs(method, url, headers, body, fileArg, fileName, fileContent);
+        final response = syncRequestCs(method, url, headers, body, fileArg, fileName, fileContent, certificate);
     #elseif js
-        final response = syncRequestJs(method, url, headers, body, fileArg, fileName, fileContent);
+        final response = syncRequestJs(method, url, headers, body, fileArg, fileName, fileContent, certificate);
     #elseif use_tink
-        final response = syncRequestTink(method, url, headers, body, fileArg, fileName, fileContent);
+        final response = syncRequestTink(method, url, headers, body, fileArg, fileName, fileContent, certificate);
     #elseif python
-        final response = syncRequestPython(method, url, headers, body, fileArg, fileName, fileContent);
+        final response = syncRequestPython(method, url, headers, body, fileArg, fileName, fileContent, certificate);
     #else
-        final response = syncRequestStd(method, url, headers, body, fileArg, fileName, fileContent);
+        final response = syncRequestStd(method, url, headers, body, fileArg, fileName, fileContent, certificate);
     #end
 
-        final level = (response.status >= 400 || response.status == -1)
+        if(logLevel == null){
+            logLevel = (response.status >= 400 || response.status == -1)
             ? Logger.LEVEL_ERROR
             : Logger.LEVEL_INFO;
-        logRequest(level, method, url, headers, body, response);
+        }
+        logRequest(logLevel, method, url, headers, body, response, logger);
 
         if (response.status != -1) {
             return response;
@@ -48,7 +56,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 #if cs
     private static function syncRequestCs(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+            fileArg: String, fileName: String, fileContent: Blob, certificate: String) : Response {
         try {
             final boundary = '---------------------------${StringTools.hex(Std.int(Date.now().getTime() * 1000))}';
 
@@ -112,7 +120,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 #elseif js
     private static function syncRequestJs(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+            fileArg: String, fileName: String, fileContent: Blob, certificate:String) : Response {
         initXMLHttpRequest();
 
         final xhr = new js.html.XMLHttpRequest();
@@ -149,7 +157,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 #elseif use_tink
     private static function syncRequestTink(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+            fileArg: String, fileName: String, fileContent: Blob, certificate:String) : Response {
         final methods = [
             'GET' => tink.http.Method.GET,
             'PUT' => tink.http.Method.PUT,
@@ -199,10 +207,10 @@ class ApiClientImpl extends Base implements IApiClient {
 
 #elseif python
     private static function syncRequestPython(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+            fileArg: String, fileName: String, fileContent: Blob, certificate: String) : Response {
         try {
             return connect.native.PythonRequest.request(
-                method, url, headers, body, fileArg, fileName, fileContent, 300);
+                method, url, headers, body, fileArg, fileName, fileContent, 300, certificate);
         } catch (ex: Dynamic) {
             return new Response(-1, Std.string(ex), null);
         }
@@ -211,7 +219,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 #else
     public function syncRequestStd(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response {
+            fileArg: String, fileName: String, fileContent: Blob, certificate:String) : Response {
         var status:Null<Int> = null;
         final responseBytes = new haxe.io.BytesOutput();
 
@@ -253,13 +261,13 @@ class ApiClientImpl extends Base implements IApiClient {
 
 
     private static function logRequest(level: Int, method: String, url: String,
-            headers: Dictionary, body: String, response: Response): Void {
+            headers: Dictionary, body: String, response: Response, ?logger:Null<Logger> = null): Void {
         final firstMessage = 'Http ${method.toUpperCase()} request to ${url}';
-        for (handler in Env.getLogger().getHandlers()) {
+        for (handler in logger.getHandlers()) {
             final fmt = handler.formatter;
             final requestList = new Collection<String>();
             if (headers != null) {
-                requestList.push('Headers:${getHeadersTable(headers, fmt)}');
+                requestList.push('Headers:\n${getHeadersTable(headers, fmt)}');
             }
             if (body != null) {
                 requestList.push(getFormattedData(body, 'Body', fmt));
@@ -270,9 +278,10 @@ class ApiClientImpl extends Base implements IApiClient {
             } else {
                 requestList.push(getFormattedData(response.text, 'Exception', fmt));
             }
-            Env.getLogger()._writeToHandler(
+            final requestLogger:Logger = logger != null ? logger : Env.getLogger();
+            requestLogger._writeToHandler(
                 level,
-                fmt.formatBlock(level,'$firstMessage${fmt.formatList(level,requestList)}'),
+                fmt.formatBlock(level, '$firstMessage\n${fmt.formatList(level, requestList)}'),
                 handler);
         }
     }
@@ -297,23 +306,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 
     private static function maskHeaders(headers: Dictionary): Dictionary {
-        final masked = new Dictionary();
-        for (key in headers.keys()) {
-            if (key == 'Authorization') {
-                final auth = Std.string(headers.get('Authorization'));
-                final parts = auth.split(':');
-                final join = (parts.length > 1) ? parts.slice(1).join(':') : '';
-                final maskedAuth = StringTools.startsWith(auth, 'ApiKey ')
-                    ? (parts.length > 1)
-                        ? (parts[0] + ':' + StringTools.lpad(join.substr(join.length - 4), '*', join.length))
-                        : 'ApiKey ' + StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length - 7)
-                    : StringTools.lpad(auth.substr(auth.length - 4), '*', auth.length);
-                masked.set('Authorization', maskedAuth);
-            } else {
-                masked.set(key, headers.get(key));
-            }
-        }
-        return masked;
+        return Dictionary.fromObject(Util.maskFields(headers.toObject()));
     }
 
 
@@ -321,15 +314,16 @@ class ApiClientImpl extends Base implements IApiClient {
             : String {
         final compact = Env.getLogger().getLevel() != Logger.LEVEL_DEBUG;
         if (Util.isJson(data)) {
-            final prefix = compact ? '$title (compact):' : '$title:';
+            final prefix = compact ? '$title (compact): ' : '$title:\n';
             final block = fmt.formatCodeBlock(
                 Env.getLogger().getLevel(),
                 Util.beautify(
                     data,
                     Env.getLogger().isCompact(),
-                    Env.getLogger().getLevel() != Logger.LEVEL_DEBUG),
+                    Env.getLogger().getLevel() != Logger.LEVEL_DEBUG,
+                    Env.getLogger().isBeautified()),
                 'json');
-            return '$prefix $block';
+            return '$prefix$block';
         } else {
             final fixedBody = compact
                 ? StringTools.lpad(data.substr(data.length - 4), '*', data.length)
@@ -340,7 +334,7 @@ class ApiClientImpl extends Base implements IApiClient {
 
 
 #if js
-    private static inline final _JS_CODE = 'var Url=require("url"),spawn=require("child_process").spawn,fs=require("fs");global.XMLHttpRequest = function(){"use strict";var S,w,N=this,v=require("http"),g=require("https"),T={},s=!1,C={"User-Agent":"node-XMLHttpRequest",Accept:"*/*"},D={},O={},r=["accept-charset","accept-encoding","access-control-request-headers","access-control-request-method","connection","content-length","content-transfer-encoding","cookie","cookie2","date","expect","host","keep-alive","origin","referer","te","trailer","transfer-encoding","upgrade","via"],o=["TRACE","TRACK","CONNECT"],R=!1,q=!1,n={};this.UNSENT=0,this.OPENED=1,this.HEADERS_RECEIVED=2,this.LOADING=3,this.DONE=4,this.readyState=this.UNSENT,this.onreadystatechange=null,this.responseText="",this.responseXML="",this.status=null,this.statusText=null,this.withCredentials=!1;this.open=function(e,t,s,r,n){if(this.abort(),q=!1,!function(e){return e&&-1===o.indexOf(e)}(e))throw new Error("SecurityError: Request method not allowed");T={method:e,url:t.toString(),async:"boolean"!=typeof s||s,user:r||null,password:n||null},L(this.OPENED)},this.setDisableHeaderCheck=function(e){s=e},this.setRequestHeader=function(e,t){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN");if(function(e){return s||e&&-1===r.indexOf(e.toLowerCase())}(e)){if(R)throw new Error("INVALID_STATE_ERR: send flag is true");e=O[e.toLowerCase()]||e,O[e.toLowerCase()]=e,D[e]=D[e]?D[e]+", "+t:t}else console.warn(\'Refused to set unsafe header \\"\'+e+\'\\"\')},this.getResponseHeader=function(e){return"string"==typeof e&&this.readyState>this.OPENED&&w&&w.headers&&w.headers[e.toLowerCase()]&&!q?w.headers[e.toLowerCase()]:null},this.getAllResponseHeaders=function(){if(this.readyState<this.HEADERS_RECEIVED||q)return"";var e="";for(var t in w.headers)"set-cookie"!==t&&"set-cookie2"!==t&&(e+=t+": "+w.headers[t]+"\\r\\n");return e.substr(0,e.length-2)},this.getRequestHeader=function(e){return"string"==typeof e&&O[e.toLowerCase()]?D[O[e.toLowerCase()]]:""},this.send=function(e){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");if(R)throw new Error("INVALID_STATE_ERR: send has already been called");var n,t=!1,s=!1,r=Url.parse(T.url);switch(r.protocol){case"https:":t=!0;case"http:":n=r.hostname;break;case"file:":s=!0;break;case void 0:case null:case"":n="localhost";break;default:throw new Error("Protocol not supported.")}if(s){if("GET"!==T.method)throw new Error("XMLHttpRequest: Only GET method is supported");if(T.async)fs.readFile(r.pathname,"utf8",function(e,t){e?N.handleError(e):(N.status=200,N.responseText=t,L(N.DONE))});else try{this.responseText=fs.readFileSync(r.pathname,"utf8"),this.status=200,L(N.DONE)}catch(e){this.handleError(e)}}else{var o=r.port||(t?443:80),a=r.pathname+(r.search?r.search:"");for(var i in C)O[i.toLowerCase()]||(D[i]=C[i]);if(D.Host=n,"["===r.host[0]&&(D.Host="["+D.Host+"]"),t&&443===o||80===o||(D.Host+=":"+r.port),T.user){void 0===T.password&&(T.password="");var h=new Buffer(T.user+":"+T.password);D.Authorization="Basic "+h.toString("base64")}"GET"===T.method||"HEAD"===T.method?e=null:e?(D["Content-Length"]=Buffer.isBuffer(e)?e.length:Buffer.byteLength(e),this.getRequestHeader("Content-Type")||(D["Content-Type"]="text/plain;charset=UTF-8")):"POST"===T.method&&(D["Content-Length"]=0);var d={host:n,port:o,path:a,method:T.method,headers:D,agent:!1,withCredentials:N.withCredentials};if(q=!1,T.async){var u=t?g.request:v.request;R=!0,N.dispatchEvent("readystatechange");var c=function(e){N.handleError(e)};S=u(d,function e(t){if(301!==(w=t).statusCode&&302!==w.statusCode&&303!==w.statusCode&&307!==w.statusCode)w.setEncoding("utf8"),L(N.HEADERS_RECEIVED),N.status=w.statusCode,w.on("data",function(e){e&&(N.responseText+=e),R&&L(N.LOADING)}),w.on("end",function(){R&&(L(N.DONE),R=!1)}),w.on("error",function(e){N.handleError(e)});else{T.url=w.headers.location;var s=Url.parse(T.url);n=s.hostname;var r={hostname:s.hostname,port:s.port,path:s.path,method:303===w.statusCode?"GET":T.method,headers:D,withCredentials:N.withCredentials};(S=u(r,e).on("error",c)).end()}}).on("error",c),e&&S.write(e),S.end(),N.dispatchEvent("loadstart")}else{var f=".node-xmlhttprequest-content-"+process.pid,l=".node-xmlhttprequest-sync-"+process.pid;fs.writeFileSync(l,"","utf8");for(var p="var http = require(\'http\'), https = require(\'https\'), fs = require(\'fs\');var doRequest = http"+(t?"s":"")+".request;var options = "+JSON.stringify(d)+";var responseText = \'\';var req = doRequest(options, function(response) {response.setEncoding(\'utf8\');response.on(\'data\', function(chunk) {  responseText += chunk;});response.on(\'end\', function() {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: null, data: {statusCode: response.statusCode, headers: response.headers, text: responseText}}), \'utf8\');fs.unlinkSync(\'"+l+"\');});response.on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});}).on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});"+(e?"req.write(\'"+JSON.stringify(e).slice(1,-1).replace(/\'/g,"\\\'")+"\');":"")+"req.end();",E=spawn(process.argv[0],["-e",p]);fs.existsSync(l););var y=JSON.parse(fs.readFileSync(f,"utf8"));E.stdin.end(),fs.unlinkSync(f),y.err?N.handleError(y.err):(w=y.data,N.status=y.data.statusCode,N.responseText=y.data.text,L(N.DONE))}}},this.handleError=function(e){this.status=0,this.statusText=e,this.responseText=e.stack,q=!0,L(this.DONE),this.dispatchEvent("error")},this.abort=function(){S&&(S.abort(),S=null),D=C,this.status=0,this.responseText="",this.responseXML="",q=!0,this.readyState===this.UNSENT||this.readyState===this.OPENED&&!R||this.readyState===this.DONE||(R=!1,L(this.DONE)),this.readyState=this.UNSENT,this.dispatchEvent("abort")},this.addEventListener=function(e,t){e in n||(n[e]=[]),n[e].push(t)},this.removeEventListener=function(e,t){e in n&&(n[e]=n[e].filter(function(e){return e!==t}))},this.dispatchEvent=function(e){if("function"==typeof N["on"+e]&&N["on"+e](),e in n)for(var t=0,s=n[e].length;t<s;t++)n[e][t].call(N)};var L=function(e){e!=N.LOADING&&N.readyState===e||(N.readyState=e,(T.async||N.readyState<N.OPENED||N.readyState===N.DONE)&&N.dispatchEvent("readystatechange"),N.readyState!==N.DONE||q||(N.dispatchEvent("load"),N.dispatchEvent("loadend")))}};';
+    private static inline final _JS_CODE = 'var Url=require("url"),spawn=require("child_process").spawn,fs=require("fs");global.XMLHttpRequest = function(){"use strict";var S,w,N=this,v=require("http"),g=require("https"),T={},s=!1,C={"User-Agent":"node-XMLHttpRequest",Accept:"*/*"},D={},O={},r=["accept-charset","accept-encoding","access-control-request-headers","access-control-request-method","connection","content-length","content-transfer-encoding","cookie","cookie2","date","expect","host","keep-alive","origin","referer","te","trailer","transfer-encoding","upgrade","via"],o=["TRACE","TRACK","CONNECT"],R=!1,q=!1,n={};this.UNSENT=0,this.OPENED=1,this.HEADERS_RECEIVED=2,this.LOADING=3,this.DONE=4,this.readyState=this.UNSENT,this.onreadystatechange=null,this.responseText="",this.responseXML="",this.status=null,this.statusText=null,this.withCredentials=!1;this.open=function(e,t,s,r,n){if(this.abort(),q=!1,!function(e){return e&&-1===o.indexOf(e)}(e))throw new Error("SecurityError: Request method not allowed");T={method:e,url:t.toString(),async:"boolean"!=typeof s||s,user:r||null,password:n||null},L(this.OPENED)},this.setDisableHeaderCheck=function(e){s=e},this.setRequestHeader=function(e,t){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN");if(function(e){return s||e&&-1===r.indexOf(e.toLowerCase())}(e)){if(R)throw new Error("INVALID_STATE_ERR: send flag is true");e=O[e.toLowerCase()]||e,O[e.toLowerCase()]=e,D[e]=D[e]?D[e]+", "+t:t}else console.warn(\'Refused to set unsafe header \\"\'+e+\'\\"\')},this.getResponseHeader=function(e){return"string"==typeof e&&this.readyState>this.OPENED&&w&&w.headers&&w.headers[e.toLowerCase()]&&!q?w.headers[e.toLowerCase()]:null},this.getAllResponseHeaders=function(){if(this.readyState<this.HEADERS_RECEIVED||q)return"";var e="";for(var t in w.headers)"set-cookie"!==t&&"set-cookie2"!==t&&(e+=t+": "+w.headers[t]+"\\r\\n");return e.substr(0,e.length-2)},this.getRequestHeader=function(e){return"string"==typeof e&&O[e.toLowerCase()]?D[O[e.toLowerCase()]]:""},this.send=function(e){if(this.readyState!==this.OPENED)throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");if(R)throw new Error("INVALID_STATE_ERR: send has already been called");var n,t=!1,s=!1,r=Url.parse(T.url);switch(r.protocol){case"https:":t=!0;case"http:":n=r.hostname;break;case"file:":s=!0;break;case void 0:case null:case"":n="localhost";break;default:throw new Error("Protocol not supported.")}if(s){if("GET"!==T.method)throw new Error("XMLHttpRequest: Only GET method is supported");if(T.async)fs.readFile(r.pathname,"utf8",function(e,t){e?N.handleError(e):(N.status=200,N.responseText=t,L(N.DONE))});else try{this.responseText=fs.readFileSync(r.pathname,"utf8"),this.status=200,L(N.DONE)}catch(e){this.handleError(e)} }else{var o=r.port||(t?443:80),a=r.pathname+(r.search?r.search:"");for(var i in C)O[i.toLowerCase()]||(D[i]=C[i]);if(D.Host=n,"["===r.host[0]&&(D.Host="["+D.Host+"]"),t&&443===o||80===o||(D.Host+=":"+r.port),T.user){void 0===T.password&&(T.password="");var h=new Buffer(T.user+":"+T.password);D.Authorization="Basic "+h.toString("base64")}"GET"===T.method||"HEAD"===T.method?e=null:e?(D["Content-Length"]=Buffer.isBuffer(e)?e.length:Buffer.byteLength(e),this.getRequestHeader("Content-Type")||(D["Content-Type"]="text/plain;charset=UTF-8")):"POST"===T.method&&(D["Content-Length"]=0);var d={host:n,port:o,path:a,method:T.method,headers:D,agent:!1,withCredentials:N.withCredentials};if(q=!1,T.async){var u=t?g.request:v.request;R=!0,N.dispatchEvent("readystatechange");var c=function(e){N.handleError(e)};S=u(d,function e(t){if(301!==(w=t).statusCode&&302!==w.statusCode&&303!==w.statusCode&&307!==w.statusCode)w.setEncoding("utf8"),L(N.HEADERS_RECEIVED),N.status=w.statusCode,w.on("data",function(e){e&&(N.responseText+=e),R&&L(N.LOADING)}),w.on("end",function(){R&&(L(N.DONE),R=!1)}),w.on("error",function(e){N.handleError(e)});else{T.url=w.headers.location;var s=Url.parse(T.url);n=s.hostname;var r={hostname:s.hostname,port:s.port,path:s.path,method:303===w.statusCode?"GET":T.method,headers:D,withCredentials:N.withCredentials};(S=u(r,e).on("error",c)).end()} }).on("error",c),e&&S.write(e),S.end(),N.dispatchEvent("loadstart")}else{var f=".node-xmlhttprequest-content-"+process.pid,l=".node-xmlhttprequest-sync-"+process.pid;fs.writeFileSync(l,"","utf8");for(var p="var http = require(\'http\'), https = require(\'https\'), fs = require(\'fs\');var doRequest = http"+(t?"s":"")+".request;var options = "+JSON.stringify(d)+";var responseText = \'\';var req = doRequest(options, function(response) {response.setEncoding(\'utf8\');response.on(\'data\', function(chunk) {  responseText += chunk;});response.on(\'end\', function() {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: null, data: {statusCode: response.statusCode, headers: response.headers, text: responseText} }), \'utf8\');fs.unlinkSync(\'"+l+"\');});response.on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});}).on(\'error\', function(error) {fs.writeFileSync(\'"+f+"\', JSON.stringify({err: error}), \'utf8\');fs.unlinkSync(\'"+l+"\');});"+(e?"req.write(\'"+JSON.stringify(e).slice(1,-1).replace(/\'/g,"\\\'")+"\');":"")+"req.end();",E=spawn(process.argv[0],["-e",p]);fs.existsSync(l););var y=JSON.parse(fs.readFileSync(f,"utf8"));E.stdin.end(),fs.unlinkSync(f),y.err?N.handleError(y.err):(w=y.data,N.status=y.data.statusCode,N.responseText=y.data.text,L(N.DONE))} } },this.handleError=function(e){this.status=0,this.statusText=e,this.responseText=e.stack,q=!0,L(this.DONE),this.dispatchEvent("error")},this.abort=function(){S&&(S.abort(),S=null),D=C,this.status=0,this.responseText="",this.responseXML="",q=!0,this.readyState===this.UNSENT||this.readyState===this.OPENED&&!R||this.readyState===this.DONE||(R=!1,L(this.DONE)),this.readyState=this.UNSENT,this.dispatchEvent("abort")},this.addEventListener=function(e,t){e in n||(n[e]=[]),n[e].push(t)},this.removeEventListener=function(e,t){e in n&&(n[e]=n[e].filter(function(e){return e!==t}))},this.dispatchEvent=function(e){if("function"==typeof N["on"+e]&&N["on"+e](),e in n)for(var t=0,s=n[e].length;t<s;t++)n[e][t].call(N)};var L=function(e){e!=N.LOADING&&N.readyState===e||(N.readyState=e,(T.async||N.readyState<N.OPENED||N.readyState===N.DONE)&&N.dispatchEvent("readystatechange"),N.readyState!==N.DONE||q||(N.dispatchEvent("load"),N.dispatchEvent("loadend")))} };';
     private static var _isXMLHttpRequestInit: Bool = false;
 
     private static function initXMLHttpRequest(): Void {

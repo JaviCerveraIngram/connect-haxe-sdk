@@ -6,7 +6,7 @@ package connect.api;
 
 import connect.util.Blob;
 import connect.util.Dictionary;
-
+import connect.logger.Logger;
 
 interface IApiClient {
     /**
@@ -19,8 +19,12 @@ interface IApiClient {
         @param fileArg Argument name of file to send in multipart requests, or `null`.
         @param fileName File name of file to send in multipart requests, or `null`.
         @param fileContent File content of file to send in multipart requests, or `null`.
+        @param certificate Certificate to send in the request, or `null`.
         @returns A `Response` object.
     **/
     public function syncRequest(method: String, url: String, headers: Dictionary, body: String,
-            fileArg: String, fileName: String, fileContent: Blob) : Response;
+            fileArg: String, fileName: String, fileContent: Blob, certificate: String, ?logLevel: Null<Int> = null) : Response;
+
+    public function syncRequestWithLogger(method: String, url: String, headers: Dictionary, body: String,
+        fileArg: String, fileName: String, fileContent: Blob, certificate: String, logger:Logger, ?logLevel: Null<Int> = null) : Response;
 }

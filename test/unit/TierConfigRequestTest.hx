@@ -2,7 +2,10 @@
     This file is part of the Ingram Micro CloudBlue Connect SDK.
     Copyright (c) 2019 Ingram Micro. All Rights Reserved.
 */
+import connect.api.IApiClient;
+import connect.api.Response;
 import connect.Env;
+import connect.logger.Logger;
 import connect.models.Activation;
 import connect.models.Events;
 import connect.models.Param;
@@ -10,40 +13,29 @@ import connect.models.Template;
 import connect.models.TierConfig;
 import connect.models.TierConfigRequest;
 import connect.models.User;
+import connect.util.Blob;
 import connect.util.Collection;
 import connect.util.Dictionary;
+import haxe.Json;
 import massive.munit.Assert;
-import test.mocks.Mock;
-
+import sys.io.File;
 
 class TierConfigRequestTest {
     @Before
     public function setup() {
-        Env._reset(new Dictionary()
-            .setString('ITierApi', 'test.mocks.TierApiMock'));
+        Env._reset(new TierConfigRequestApiClientMock());
     }
-
 
     @Test
     public function testList() {
-        // Check subject
         final requests = TierConfigRequest.list(null);
         Assert.isType(requests, Collection);
         Assert.areEqual(1, requests.length());
         Assert.isType(requests.get(0), TierConfigRequest);
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('listTierConfigRequests'));
-        Assert.areEqual(
-            [null].toString(),
-            apiMock.callArgs('listTierConfigRequests', 0).toString());
     }
-
 
     @Test
     public function testGetOk() {
-        // Check subject
         final request = TierConfigRequest.get('TCR-000-000-000');
         Assert.isType(request, TierConfigRequest);
         Assert.isType(request.configuration, TierConfig);
@@ -70,168 +62,112 @@ class TierConfigRequestTest {
         Assert.areEqual('2018-11-21T11:10:29+00:00', request.events.pended.at.toString());
         Assert.areEqual('PA-000-001', request.events.pended.by.id);
         Assert.areEqual('Username1', request.events.pended.by.name);
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('getTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000'].toString(),
-            apiMock.callArgs('getTierConfigRequest', 0).toString());
     }
-
 
     @Test
     public function testRegister() {
-        // Check subject
         final request = new TierConfigRequest().register();
         Assert.isType(request, TierConfigRequest);
-        Assert.areEqual('TCR-000-000-000', request.id);
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('createTierConfigRequest'));
-        Assert.areEqual(
-            [new TierConfigRequest()].toString(),
-            apiMock.callArgs('createTierConfigRequest', 0).toString());
     }
-
 
     @Test
     public function testUpdate() {
-        // Check subject
         final request = TierConfigRequest.get('TCR-000-000-000');
         request.getParamById('param_a').value = 'Hello, world!';
-        final updatedRequest = request.update();
+        final updatedRequest = request.update(null);
         Assert.isType(updatedRequest, TierConfigRequest);
-        Assert.areEqual(TierConfigRequest.get('TCR-000-000-000').toString(),
-            updatedRequest.toString());
-        // ^ The mock returns that request
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('updateTierConfigRequest'));
-        Assert.areEqual(
-            [request.id, request._toDiffString()].toString(),
-            apiMock.callArgs('updateTierConfigRequest', 0).toString());
+        Assert.areNotEqual(updatedRequest, request);
     }
-
 
     @Test
     public function testUpdateNoChanges() {
-        // Check subject
         final request = TierConfigRequest.get('TCR-000-000-000');
-        final updatedRequest = request.update();
+        final updatedRequest = request.update(null);
         Assert.isType(updatedRequest, TierConfigRequest);
-        Assert.areEqual(request.toString(), updatedRequest.toString());
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(0, apiMock.callCount('updateTierConfigRequest'));
+        Assert.areEqual(updatedRequest, request);
     }
 
+    @Test
+    public function testUpdateWithTcParams() {
+        final request = TierConfigRequest.get('TCR-000-000-000');
+        request.configuration.getParamById('tc_param').value = 'New value';
+        final updatedRequest = request.update(null);
+        Assert.isNotNull(updatedRequest.getParamById('tc_param'));
+    }
+
+    @Test
+    public function testUpdateWithParams() {
+        final param = new Param();
+        param.id = 'PM-9861-7949-8492-0001';
+        param.valueError = 'Please provide a value.';
+        final request = TierConfigRequest.get('TCR-000-000-000');
+        final updatedRequest = request.update(new Collection<Param>().push(param));
+        Assert.isType(updatedRequest, TierConfigRequest);
+        Assert.areEqual(request.toString(), updatedRequest.toString());
+    }
+
+    @Test
+    public function testUpdateWithEmptyValueError() {
+        final request = TierConfigRequest.get('TCR-000-000-000');
+        request.configuration.getParamById('tc_param').valueError = '';
+        final updatedRequest = request.update(null);
+        Assert.areEqual('tc_param_value', updatedRequest.getParamById('tc_param').value);
+        Assert.areEqual('', updatedRequest.getParamById('tc_param').valueError);
+    }
+
+    @Test
+    public function testUpdateWithValueError() {
+        final request = TierConfigRequest.get('TCR-000-000-000');
+        request.configuration.getParamById('tc_param').valueError = 'Changed';
+        final updatedRequest = request.update(null);
+        Assert.areEqual('tc_param_value', updatedRequest.getParamById('tc_param').value);
+        Assert.areEqual('Changed', updatedRequest.getParamById('tc_param').valueError);
+    }
+
+    @Test
+    public function testUpdateWithNotes() {
+        final request = TierConfigRequest.get('TCR-000-000-000');
+        request.notes = "Notes text";
+        final updatedRequest = request.update(null);
+        Assert.isType(request, TierConfigRequest);
+    }
 
     @Test
     public function testApproveByTemplate() {
-        // Check subject
         final request = TierConfigRequest.get('TCR-000-000-000');
-        request.approveByTemplate('TL-XXX-XXX-XXX');
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('approveTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000', '{"template_id":"TL-XXX-XXX-XXX"}'].toString(),
-            apiMock.callArgs('approveTierConfigRequest', 0).toString());
+        Assert.isTrue(request.approveByTemplate('TL-XXX-XXX-XXX'));
     }
-
 
     @Test
     public function testApproveByTile() {
-        // Check subject
         final request = TierConfigRequest.get('TCR-000-000-000');
-        request.approveByTile('Hello, world!');
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('approveTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000', '{"activation_tile":"Hello, world!"}'].toString(),
-            apiMock.callArgs('approveTierConfigRequest', 0).toString());
+        Assert.isType(request.approveByTile('Hello, world!'), TierConfigRequest);
     }
-
 
     @Test
     public function testFail() {
-        // Check subject
-        final request = TierConfigRequest.get('TCR-000-000-000');
-        request.fail("Failing...");
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('failTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000', '{"reason":"Failing..."}'].toString(),
-            apiMock.callArgs('failTierConfigRequest', 0).toString());
+        Assert.isTrue(TierConfigRequest.get('TCR-000-000-000').fail("Failing..."));
     }
 
-    
     @Test
     public function testInquire() {
-        // Check subject
-        TierConfigRequest.get('TCR-000-000-000').inquire();
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('inquireTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000'].toString(),
-            apiMock.callArgs('inquireTierConfigRequest', 0).toString());
+        Assert.isTrue(TierConfigRequest.get('TCR-000-000-000').inquire());
     }
-
 
     @Test
     public function testPend() {
-        // Check subject
-        TierConfigRequest.get('TCR-000-000-000').pend();
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('pendTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000'].toString(),
-            apiMock.callArgs('pendTierConfigRequest', 0).toString());
+        Assert.isTrue(TierConfigRequest.get('TCR-000-000-000').pend());
     }
-
 
     @Test
     public function testAssign() {
-        // Check subject
-        final request = TierConfigRequest.get('TCR-000-000-000');
-        request.assign();
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('assignTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000'].toString(),
-            apiMock.callArgs('assignTierConfigRequest', 0).toString());
+        Assert.isTrue(TierConfigRequest.get('TCR-000-000-000').assign());
     }
-
 
     @Test
     public function testUnassign() {
-        // Check subject
-        final request = TierConfigRequest.get('TCR-000-000-000');
-        request.unassign();
-
-        // Check mocks
-        final apiMock = cast(Env.getTierApi(), Mock);
-        Assert.areEqual(1, apiMock.callCount('unassignTierConfigRequest'));
-        Assert.areEqual(
-            ['TCR-000-000-000'].toString(),
-            apiMock.callArgs('unassignTierConfigRequest', 0).toString());
+        Assert.isTrue(TierConfigRequest.get('TCR-000-000-000').unassign());
     }
-
 
     @Test
     public function testGetParamByIdOk() {
@@ -242,11 +178,58 @@ class TierConfigRequestTest {
         Assert.areEqual('param_a_value', param.value);
     }
 
-
     @Test
     public function testGetParamByIdKo() {
         final request = TierConfigRequest.get('TCR-000-000-000');
         final param = request.getParamById('invalid-id');
         Assert.isNull(param);
     }
+}
+
+class TierConfigRequestApiClientMock implements IApiClient {
+    static final FILE = 'test/unit/data/tierconfigrequests.json';
+
+    public function new() {
+    }
+
+    public function syncRequest(method: String, url: String, headers: Dictionary, body: String,
+            fileArg: String, fileName: String, fileContent: Blob, certificate: String,  ?logLevel: Null<Int> = null) : Response {
+        return syncRequestWithLogger(method, url, headers, body,fileArg, fileName, fileContent, certificate, new Logger(null));
+    }
+
+    public function syncRequestWithLogger(method: String, url: String, headers: Dictionary, body: String,
+        fileArg: String, fileName: String, fileContent: Blob, certificate: String, logger: Logger,  ?logLevel: Null<Int> = null) : Response {
+    switch (method) {
+        case 'GET':
+            switch (url) {
+                case 'https://api.conn.rocks/public/v1/tier/config-requests':
+                    return new Response(200, File.getContent(FILE), null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000':
+                    final request = Json.parse(File.getContent(FILE))[0];
+                    return new Response(200, Json.stringify(request), null);
+            }
+        case 'POST':
+            switch (url) {
+                case 'https://api.conn.rocks/public/v1/tier/config-requests':
+                    return new Response(200, body, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/approve':
+                    return new Response(200, body, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/fail':
+                    return new Response(204, null, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/inquire':
+                    return new Response(204, null, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/pend':
+                    return new Response(204, null, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/assign':
+                    return new Response(204, null, null);
+                case 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000/unassign':
+                    return new Response(204, null, null);
+            }
+        case 'PUT':
+            if (url == 'https://api.conn.rocks/public/v1/tier/config-requests/TCR-000-000-000') {
+                return new Response(200, body, null);
+            }
+    }
+    return new Response(404, null, null);
+}
 }

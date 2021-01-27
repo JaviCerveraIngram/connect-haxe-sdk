@@ -5,12 +5,10 @@
 package connect.util;
 
 import connect.Env;
-import connect.logger.Logger;
 
 
 @:dox(hide)
 class Util {
-
     /**
      * Given a list of regex search all in a string and hide this values
      * @param text 
@@ -30,11 +28,12 @@ class Util {
         If the text contains a JSON string representation, it returns it beautified using two space
         indentation. Otherwise, returns the string as-is. If `compact` is `true` and the text
         contains a JSON string representation, only the id is returned or a string with all the
-        fields if it does not have an id.
+        fields if it does not have an id. If `beautify` is `true`, the JSON is returned with
+        spacing and indentation.
     */
-    public static function beautify(text:String, compact:Bool, masked: Bool):String {
+    public static function beautify(text:String, compact:Bool, masked:Bool, beautify:Bool):String {
         try {
-            return beautifyObject(haxe.Json.parse(text), compact, masked);
+            return beautifyObject(haxe.Json.parse(text), compact, masked, beautify);
         } catch (ex:Dynamic) {
            return replaceStrSensitiveData(text,Env.getLogger().getRegExMaskingList());
         }
@@ -44,9 +43,11 @@ class Util {
     /*
         @returns The JSON representation of the object beautified using two space indentation.
         If `compact` is `true` and the text contains a JSON string representation, only the id
-        is returned or a string with all the fields if it does not have an id.
+        is returned or a string with all the fields if it does not have an id. If `compact` is
+        false and `masked` is true, all fields in the mask list will be masked.
     */
-    public static function beautifyObject(obj:Dynamic, compact:Bool, masked:Bool):String {
+    public static function beautifyObject(obj:Dynamic, compact:Bool, masked:Bool, beautify:Bool):String {
+        final spacing = beautify ? '  ' : null;
         if (compact) {
             if (Type.typeof(obj) == TObject) {
                 // Json contains an object
@@ -65,37 +66,65 @@ class Util {
                         ? '{ ' + Reflect.fields(el).join(', ') + ' }'
                         : Std.string(el);
                 });
-                return haxe.Json.stringify(mapped, null, '  ');
+                return haxe.Json.stringify(mapped, null, spacing);
             }
         } else {
-            return haxe.Json.stringify(masked ? maskFields(obj) : obj, null, '  ');
+            return haxe.Json.stringify(masked ? maskParams(maskFields(obj)) : obj, null, spacing);
         }
     }
 
-    public static function maskFields(obj:Dynamic): Dynamic {
-        final  maskedFields= Env.getLogger().getMaskedFields();
+    public static function maskFields(obj:Dynamic):Dynamic {
         if (Type.typeof(obj) == TObject) {
-            for(fieldName in Reflect.fields(obj)){
-                if(maskedFields.indexOf(fieldName) !=  - 1){
-                    if (Type.typeof(Reflect.field(obj, fieldName)) == TObject){
-                        if (Reflect.hasField(Reflect.field(obj, fieldName), 'id')) {
-                            Reflect.setField(obj, fieldName, Reflect.field(obj, fieldName).id);
+            final maskedFields = Env.getLogger().getMaskedFields();
+            for (fieldName in Reflect.fields(obj)) {
+                final value = Reflect.field(obj, fieldName);
+                if (maskedFields.indexOf(fieldName) != -1) {
+                    if (Type.typeof(value) == TObject){
+                        if (Reflect.hasField(value, 'id')) {
+                            Reflect.setField(obj, fieldName, value.id);
                         } else {
                             Reflect.setField(obj, fieldName, '{object}');
                         }
-                    }else{
-                        Reflect.setField(obj, fieldName, 'HIDDEN FIELD');
+                    } else {
+                        Reflect.setField(obj, fieldName, StringTools.lpad('', '*', value.length));
                     }
-                }else if (Type.typeof(obj) == TObject || Std.is(obj,connect.util.Collection) ||  Std.is(obj, Array)){
-                    Reflect.setField(obj, fieldName, maskFields(Reflect.field(obj, fieldName)));
+                } else if (Type.typeof(value) == TObject || Std.is(value, connect.util.Collection) || Std.is(value, Array)) {
+                    Reflect.setField(obj, fieldName, maskFields(value));
                 }
             }
             return obj;
-        }else if (Std.is(obj, Array)){
+        } else if (Std.is(obj, Array)) {
             final arr: Array<Dynamic> = obj;
-            return arr.map(function(el) {
-                return maskFields(el);
-            });
+            return arr.map(el -> maskFields(el));
+        }
+        return obj;
+    }
+
+
+    public static function maskParams(obj:Dynamic):Dynamic {
+        if (Type.typeof(obj) == TObject) {
+            final maskedParams = Env.getLogger().getMaskedParams();
+            for (fieldName in Reflect.fields(obj)) {
+                final value = Reflect.field(obj, fieldName);
+                if (fieldName == 'params' && Std.is(value, Array)) {
+                    for (param in cast(value, Array<Dynamic>)) {
+                        if (Type.typeof(param) == TObject && Reflect.hasField(param, 'id') && Reflect.hasField(param, 'value')) {
+                            final isPassword = Reflect.hasField(param, 'type')
+                                ? (Reflect.field(param, 'type') == 'password')
+                                : false;
+                            if (maskedParams.indexOf(Std.string(Reflect.field(param, 'id'))) != -1 || isPassword) {
+                                final paramValue = Std.string(Reflect.field(param, 'value'));
+                                Reflect.setField(param, 'value', StringTools.lpad('', '*', paramValue.length));
+                            }
+                        }
+                    }
+                } else if (Type.typeof(value) == TObject || Std.is(value, connect.util.Collection) || Std.is(value, Array)) {
+                    Reflect.setField(obj, fieldName, maskParams(value));
+                }
+            }
+        } else if (Std.is(obj, Array)) {
+            final arr: Array<Dynamic> = obj;
+            return arr.map(el -> maskParams(el));
         }
         return obj;
     }
@@ -150,8 +179,29 @@ class Util {
      */
     public static function createObjectDiff(object:Dynamic, previous:Dynamic):Dynamic {
         return Util.addIdsToObject(
-            new Diff(previous, object).apply({id: object.id}),
+            new diff.Diff(previous, object).apply({id: object.id}),
             previous);
+    }
+
+
+    /**
+     * Splits the given text into its lines, detecting Windows (CR+LF), Mac OS Classic (CR) and
+     * Unix (LF) line endings.
+     * @param text 
+     * @return Array<String> 
+     */
+    public static function getLines(text: String): Array<String> {
+        final windowsReplaced = StringTools.replace(Std.string(text), '\r\n', '\n');
+        final macosReplaced = StringTools.replace(windowsReplaced, '\r', '\n');
+        return macosReplaced.split('\n');
+    }
+
+
+    /**
+     * @return Int `1` if the argument is `true`, `0` otherwise.
+     */
+    public static function boolToInt(b: Bool): Int {
+        return b ? 1 : 0;
     }
 
 

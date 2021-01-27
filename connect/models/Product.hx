@@ -8,7 +8,6 @@ import connect.api.Query;
 import connect.util.Collection;
 import connect.util.DateTime;
 
-
 /**
     Represents basic marketing information about salable items, parameters, configurations,
     latest published version and connections.
@@ -21,56 +20,51 @@ class Product extends IdModel {
     /** Product name. **/
     public var name: String;
 
-
     /** Product icon URI. **/
     public var icon: String;
-
 
     /** Short description of `this` Product. **/
     public var shortDescription: String;
 
-
     /** Detailed description of `this` Product. **/
     public var detailedDescription: String;
-
 
     /** Version of `this` Product. **/
     public var version: Int;
 
-
     /** Date of publishing. **/
     public var publishedAt: DateTime;
-
 
     /** Product configurations. **/
     public var configurations: Configurations;
 
-
     /** Customer UI Settings. **/
     public var customerUiSettings: CustomerUiSettings;
-
 
     /** Product Category. **/
     public var category: Category;
 
-
     /** Product owner Account. **/
     public var owner: Account;
-
 
     /** true if version is latest or for master versions without versions, false otherwise. **/
     public var latest: Bool;
 
-
     /** Statistics of product use, depends on account of callee. **/
     public var stats: ProductStats;
 
-
     // Undocumented fields (they appear in PHP SDK)
-
 
     public var status: String;
 
+    public function new() {
+        super();
+        this._setFieldClassNames([
+            'publishedAt' => 'DateTime',
+            'owner' => 'Account',
+            'stats' => 'ProductStats'
+        ]);
+    }
 
     /**
         Lists all Products that match the given filters. Supported filters are:
@@ -96,7 +90,6 @@ class Product extends IdModel {
         return Model.parseArray(Product, products);
     }
 
-
     /** @returns The Product with the given id, or `null` if it was not found. **/
     public static function get(id: String): Product {
         try {
@@ -106,7 +99,6 @@ class Product extends IdModel {
             return null;
         }
     }
-
 
     /**
         Lists all Actions for the Product that match the given filters. Supported filters are:
@@ -124,7 +116,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns The Action for `this` Product with the given id, or `null` if it was not found.
     **/
@@ -136,7 +127,6 @@ class Product extends IdModel {
             return null;
         }
     }
-
 
     /**
         @returns The link for `this` Product's Action with the given id,
@@ -150,7 +140,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns A Collection of Connections for `this` Product.
     **/
@@ -163,32 +152,107 @@ class Product extends IdModel {
         }
     }
 
-
     /**
-        @returns A Collection of Items for `this` Product.
-    **/
-    public function getItems() : Collection<Item> {
+     * Lists all Items of `this` Product that match the given filters. Supported filters are:
+     * 
+     * - limit
+     * - offset
+     * 
+     * @param filters 
+     * @return Collection<Item>
+     */
+    public function listItems(filters: Query) : Collection<Item> {
         try {
-            final items = Env.getGeneralApi().getProductItems(this.id);
+            final items = Env.getGeneralApi().listProductItems(this.id, filters);
             return Model.parseArray(Item, items);
         } catch (ex: Dynamic) {
             return new Collection<Item>();
         }
     }
 
+    /**
+        @returns A Collection of Items for `this` Product.
+    **/
+    public function getItems() : Collection<Item> {
+        return this.listItems(null);
+    }
 
     /**
-        @returns A Collection of Params for `this` Product.
-    **/
-    public function getParameters() : Collection<Param> {
+     * Lists all parameters of `this` Product that match the given filters. Supported filters are:
+     * 
+     * - scope
+     * - phase
+     * - type
+     * - constraints
+     * - name
+     * 
+     * @param filters
+     * @return Collection<Param>
+     */
+    public function listParameters(filters: Query): Collection<Param> {
         try {
-            final params = Env.getGeneralApi().getProductParameters(this.id);
+            final params = Env.getGeneralApi().listProductParameters(this.id, filters);
             return Model.parseArray(Param, params);
         } catch (ex: Dynamic) {
             return new Collection<Param>();
         }
     }
 
+    /**
+     * Get the product parameter with the given `paramId`.
+     * @param paramId Id of the parameter
+     * @return Param
+     */
+    public function getParameter(paramId: String): Param {
+        try {
+            final param = Env.getGeneralApi().getProductParameter(this.id, paramId);
+            return Model.parse(Param, param);
+        } catch (ex: Dynamic) {
+            return null;
+        }
+    }
+
+    /**
+     * Creates the given parameter in `this` Product.
+     * @param param The parameter to create in the Product.
+     * @return Param A copy of the parameter, with an id assigned to it.
+     */
+    public function createParameter(param: Param): Param {
+        try {
+            final param = Env.getGeneralApi().createProductParameter(this.id, param.toString());
+            return Model.parse(Param, param);
+        } catch (ex: Dynamic) {
+            return null;
+        }
+    }
+
+    /**
+     * Updates the given parameter in `this` Product.
+     * @param param The parameter to update.
+     * @return Param A copy of the parameter.
+     */
+    public function updateParameter(param: Param): Param {
+        try {
+            final param = Env.getGeneralApi().updateProductParameter(this.id, param.id, param.toString());
+            return Model.parse(Param, param);
+        } catch (ex: Dynamic) {
+            return null;
+        }
+    }
+
+    /**
+     * Deletes the parameter with the given `paramId` from `this` Product.
+     * @param paramId 
+     * @return Bool Whether the parameter was correctly deleted.
+     */
+    public function deleteParameter(paramId: String): Bool {
+        try {
+            Env.getGeneralApi().deleteProductParameter(this.id, paramId);
+            return true;
+        } catch (ex: Dynamic) {
+            return false;
+        }
+    }
 
     /**
         @returns A Collection of Templates for `this` Product.
@@ -202,7 +266,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns A Collection of Product versions for `this` Product.
     **/
@@ -215,7 +278,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns The version for `this` Product with the given value, or `null` if it was not found.
     **/
@@ -227,7 +289,6 @@ class Product extends IdModel {
             return null;
         }
     }
-
 
     /**
         @returns The Collection of Actions for `this` Product version.
@@ -242,7 +303,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns The specified Action for `this` Product version, or `null` if it was not found.
     **/
@@ -255,7 +315,6 @@ class Product extends IdModel {
             return null;
         }
     }
-
 
     /**
         @returns The link for `this` Product version's Action with the given id,
@@ -270,7 +329,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns A Collection of Items for `this` Product version.
     **/
@@ -282,7 +340,6 @@ class Product extends IdModel {
             return new Collection<Item>();
         }
     }
-
 
     /**
         @returns A Collection of Params for `this` Product version.
@@ -296,7 +353,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns A Collection of Templates for `this` Product version.
     **/
@@ -308,7 +364,6 @@ class Product extends IdModel {
             return new Collection<Template>();
         }
     }
-
 
     /**
         Lists all ProductConfigurationParams that match the given filters. Supported filters are:
@@ -333,7 +388,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         Creates or updates a ProductConfigurationParam.
 
@@ -349,7 +403,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns A Collection of Agreements for `this` Product.
     **/
@@ -361,7 +414,6 @@ class Product extends IdModel {
             return new Collection<Agreement>();
         }
     }
-
 
     /**
         Lists all Media that match the given filters. Supported filters are:
@@ -382,7 +434,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         Create a new media for `this` Product.
 
@@ -397,7 +448,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         @returns The Media for `this` Product with the given id, or `null` if it was not found.
     **/
@@ -409,7 +459,6 @@ class Product extends IdModel {
             return null;
         }
     }
-
 
     /**
         Updates a Media of `this` Product.
@@ -425,7 +474,6 @@ class Product extends IdModel {
         }
     }
 
-
     /**
         Deletes a Media of `this` Product.
 
@@ -438,15 +486,5 @@ class Product extends IdModel {
         } catch (ex: Dynamic) {
             return null;
         }
-    }
-
-
-    public function new() {
-        super();
-        this._setFieldClassNames([
-            'publishedAt' => 'DateTime',
-            'owner' => 'Account',
-            'stats' => 'ProductStats'
-        ]);
     }
 }

@@ -12,6 +12,7 @@ class JavaIterator<T> implements java.util.Iterator<T> {
         this.index = 0;
     }
 
+
     public function hasNext(): Bool {
         return index < this.array.length;
     }
@@ -23,7 +24,7 @@ class JavaIterator<T> implements java.util.Iterator<T> {
 
 
     public function remove(): Void {
-        // Not implemented
+        // TODO: Not implemented
     }
 
 

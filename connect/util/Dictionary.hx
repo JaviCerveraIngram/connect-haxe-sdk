@@ -180,6 +180,13 @@ class Dictionary extends Base {
         return map.keys();
     }
 
+    /**
+        Returns true if `this` Dictionary has not keys
+        @return Bool
+     **/
+    public function isEmpty():Bool{
+        return map.keys() == null || !map.keys().hasNext();
+    }
 
     /**
         Removes the mapping of `key` and returns true if such a mapping existed,
@@ -291,7 +298,7 @@ class Dictionary extends Base {
     private static function toObject_r(x: Dynamic) : EitherType<Array<Dynamic>, Dynamic> {
         switch (Type.typeof(x)) {
             case TClass(Collection):
-                final col: Collection<Dictionary> = x;
+                final col: Collection<Dynamic> = x;
                 final arr = new Array<Dynamic>();
                 for (elem in col) {
                     arr.push(toObject_r(elem));
@@ -306,7 +313,12 @@ class Dictionary extends Base {
                 }
                 return obj;
             default:
-                return x;
+                final classObj = Type.getClass(x);
+                final instanceFields = (classObj != null)
+                    ? Type.getInstanceFields(classObj)
+                    : [];
+                final hasToObject = instanceFields.indexOf('toObject') > -1;
+                return hasToObject ? x.toObject() : x;
         }
     }
 

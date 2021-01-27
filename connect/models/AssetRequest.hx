@@ -8,7 +8,6 @@ import connect.api.Query;
 import connect.util.Collection;
 import connect.util.DateTime;
 
-
 /**
     Represents a request of the Fulfillment Api.
 **/
@@ -16,14 +15,11 @@ class AssetRequest extends IdModel {
     /** Type of request. One of: purchase, change, suspend, resume, renew, cancel. **/
     public var type: String;
 
-
     /** Date of request creation. **/
     public var created: DateTime;
 
-
     /** Date of last request modification. **/
     public var updated: DateTime;
-
 
     /**
         Status of request. One of: pending, inquiring, failed, approved.
@@ -39,10 +35,8 @@ class AssetRequest extends IdModel {
     **/
     public var status: String;
 
-
     /** URL for customer/reseller/provider for modifying param based on vendor's feedback. **/
     public var paramsFormUrl: String;
-
 
     /**
         Activation key content for activating the subscription on vendor portal.
@@ -50,26 +44,20 @@ class AssetRequest extends IdModel {
     **/
     public var activationKey: String;
 
-
     /** Fail reason in case of status of request is failed. **/
     public var reason: String;
-
 
     /** Details of note. **/
     public var note: String;
 
-
     /** Asset object **/
     public var asset: Asset;
-
 
     /** Contract object. **/
     public var contract: Contract;
 
-
     /** Marketplace object. **/
     public var marketplace: Marketplace;
-
 
     /**
         Connect returns either a String or a JSON object in this field. When it is an object,
@@ -77,6 +65,14 @@ class AssetRequest extends IdModel {
     **/
     public var assignee: String;
 
+    public function new() {
+        super();
+        this._setFieldClassNames([
+            'created' => 'DateTime',
+            'updated' => 'DateTime',
+            'assignee' => 'String' // Assigne could be an object, so force conversion to string
+        ]);
+    }
 
     /**
         Lists all requests that match the given filters. Supported filters are:
@@ -105,7 +101,6 @@ class AssetRequest extends IdModel {
         return Model.parseArray(AssetRequest, requests);
     }
 
-
     /** @returns The AssetRequest with the given id, or `null` if it was not found. **/
     public static function get(id: String): AssetRequest {
         try {
@@ -115,7 +110,6 @@ class AssetRequest extends IdModel {
             return null;
         }
     }
-
 
     /**
         Registers a new AssetRequest on Connect, based on the data of `this` AssetRequest, which
@@ -139,34 +133,57 @@ class AssetRequest extends IdModel {
         }
     }
 
-
     /**
         Updates the request in the server with the data changed in `this` model.
 
-        You should reassign your request with the object returned by this method, so the next time
-        you call `update` on the object, the SDK knows the fields that already got updated in a
-        previous call, like this:
+        If no parameters are specified for updating, you should reassign your request with the
+        object returned by this method, so the next time you call `update` on the object, the SDK
+        knows the fields that already got updated in a previous call, like this:
 
         ```
-        request = request.update();
+        request = request.update(null);
         ```
 
+        @param params A collection of parameters to update. If `null` is passed, then the
+        parameters that have changed in the request will be sent.
         @returns The AssetRequest returned from the server, which should contain
         the same data as `this` AssetRequest.
     **/
-    public function update(): AssetRequest {
-        final diff = this._toDiff();
-        final hasModifiedFields = Reflect.fields(diff).length > 1;
-        if (hasModifiedFields) {
-            final request = Env.getFulfillmentApi().updateRequest(
-                this.id,
-                haxe.Json.stringify(diff));
-            return Model.parse(AssetRequest, request);
+    public function update(params: Collection<Param>): AssetRequest {
+        if (params == null) {
+            final diff = this._toDiff();
+            final hasModifiedFields = Reflect.fields(diff).length > 1;
+            if (hasModifiedFields) {
+                final request = Env.getFulfillmentApi().updateRequest(
+                    this.id,
+                    haxe.Json.stringify(addValueToParams(diff)),this);
+                return Model.parse(AssetRequest, request);
+            } else {
+                return this;
+            }
         } else {
+            if (params.length() > 0) {
+                Env.getFulfillmentApi().updateRequest(
+                    this.id,
+                    '{"asset":{"params":${params.toString()}}}',this);
+            }
             return this;
         }
     }
 
+    private function addValueToParams(obj: Dynamic): Dynamic {
+        final asset = Reflect.field(obj, 'asset');
+        final params: Array<Dynamic> = (asset != null) ? Reflect.field(asset, 'params') : null;
+        if (params != null) {
+            Lambda.iter(params, function(p) {
+                if (!Reflect.hasField(p, 'value')) {
+                    final value = this.asset.getParamById(Reflect.field(p, 'id')).value;
+                    Reflect.setField(p, 'value', value);
+                }
+            });
+        }
+        return obj;
+    }
 
     /**
         Changes `this` AssetRequest status to "approved", sending the id of a Template to render
@@ -182,12 +199,11 @@ class AssetRequest extends IdModel {
         final request = Env.getFulfillmentApi().changeRequestStatus(
             this.id,
             'approve',
-            haxe.Json.stringify({template_id: id})
+            haxe.Json.stringify({template_id: id}), this
         );
         this._updateConversation('Request approved using template $id.');
         return Model.parse(AssetRequest, request);
     }
-
 
     /**
         Changes `this` AssetRequest status to "approved", rendering a tile on the portal with
@@ -203,12 +219,11 @@ class AssetRequest extends IdModel {
         final request = Env.getFulfillmentApi().changeRequestStatus(
             this.id,
             'approve',
-            haxe.Json.stringify({activation_tile: text})
+            haxe.Json.stringify({activation_tile: text}), this
         );
         this._updateConversation('Request approved using custom activation tile.');
         return Model.parse(AssetRequest, request);
     }
-
 
     /**
         Changes the status of `this` AssetRequest to "failed".
@@ -223,12 +238,11 @@ class AssetRequest extends IdModel {
         final request = Env.getFulfillmentApi().changeRequestStatus(
             this.id,
             'fail',
-            haxe.Json.stringify({reason: reason})
+            haxe.Json.stringify({reason: reason}), this
         );
         this._updateConversation('Request failed: $reason.');
         return Model.parse(AssetRequest, request);
     }
-
 
     /**
         Changes the status of `this` AssetRequest to "inquiring".
@@ -247,12 +261,11 @@ class AssetRequest extends IdModel {
         final request = Env.getFulfillmentApi().changeRequestStatus(
             this.id,
             'inquire',
-            haxe.Json.stringify(body)
+            haxe.Json.stringify(body), this
         );
         this._updateConversation('Request inquired.');
         return Model.parse(AssetRequest, request);
     }
-
 
     /**
         Changes the status of `this` AssetRequest to "pending".
@@ -267,12 +280,11 @@ class AssetRequest extends IdModel {
         final request = Env.getFulfillmentApi().changeRequestStatus(
             this.id,
             'pend',
-            haxe.Json.stringify({})
+            haxe.Json.stringify({}), this
         );
         this._updateConversation('Request pended.');
         return Model.parse(AssetRequest, request);
     }
-
 
     /**
         Assigns `this` request to the assignee with the given `assigneeId`.
@@ -283,14 +295,13 @@ class AssetRequest extends IdModel {
     public function assign(assigneeId: String): AssetRequest {
         final request = Env.getFulfillmentApi().assignRequest(
             this.id,
-            assigneeId
+            assigneeId,
+            this
         );
         this._updateConversation('Request assigned to $assigneeId.');
         return Model.parse(AssetRequest, request);
     }
 
-
-    
     /**
         @returns Whether `this` AssetRequest is pending migration. This is indicated by the
         presence of a parameter (by default name "migration_info") that contains JSON data.
@@ -300,35 +311,23 @@ class AssetRequest extends IdModel {
         return param != null && param.value != null && param.value != '';
     }
 
-
     /** @returns The Conversation assigned to `this` AssetRequest, or `null` if there is none. **/
     public function getConversation(): Conversation {
-        final convs = Conversation.list(new Query().equal('instance_id', this.id));
+        final convs = Conversation.list(new Query().equal('instance_id', this.id), this);
         final conv = (convs.length() > 0) ? convs.get(0) : null;
         if  (conv != null && conv.id != null && conv.id != '') {
-            return Conversation.get(conv.id);
+            return Conversation.get(conv.id, this);
         } else {
             return null;
         }
     }
-
-
-    public function new() {
-        super();
-        this._setFieldClassNames([
-            'created' => 'DateTime',
-            'updated' => 'DateTime',
-            'assignee' => 'String' // Assigne could be an object, so force conversion to string
-        ]);
-    }
-
 
     @:dox(hide)
     public function _updateConversation(message: String): Void {
         final conversation = this.getConversation();
         if (conversation != null) {
             try {
-                conversation.createMessage(message);
+                conversation.createMessage(message,this);
             } catch (ex: Dynamic) {
                 Env.getLogger().write(
                     connect.logger.Logger.LEVEL_ERROR,

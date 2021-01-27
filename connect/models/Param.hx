@@ -5,6 +5,7 @@
 package connect.models;
 
 import connect.util.Collection;
+import connect.util.Dictionary;
 
 
 /**
@@ -23,7 +24,7 @@ class Param extends IdModel {
     public var description: String;
 
 
-    /** Type of parameter. **/
+    /** Type of parameter. One of: text, dropdown, password, email, checkbox, subdomain, domain, phone, url, choice. **/
     public var type: String;
 
 
@@ -63,6 +64,10 @@ class Param extends IdModel {
     public var events: Events;
 
 
+    /** Only for parameter types phone, address, checkbox and object. **/
+    public var structuredValue: Dictionary;
+
+
     // Undocumented fields (they appear in PHP SDK)
 
 
@@ -83,6 +88,18 @@ class Param extends IdModel {
         this._setFieldClassNames([
             'valueChoice' => 'String',
             'valueChoices' => 'Choice',
+            'structuredValue' => 'Dictionary',
         ]);
+    }
+
+    /**
+     * If `this` Param is a checkbox, returns the status of the field specified in the param.
+     * @param fieldName Name of the field whose status we want to check.
+     * @return Bool Whether the checkbox is checked.
+     */
+    public function isCheckboxChecked(fieldName: String): Bool {
+        return (type == 'checkbox' && structuredValue != null)
+            ? structuredValue.getBool(fieldName)
+            : false;
     }
 }

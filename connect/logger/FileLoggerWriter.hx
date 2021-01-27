@@ -35,13 +35,14 @@ class FileLoggerWriter extends Base implements ILoggerWriter {
 
 
     public function writeLine(line: String): Void {
+        final lineStr = Std.string(line); // Dynamic targets could send another type
         if (this.getFile() != null) {
-            this.getFile().writeString(line + '\n');
+            this.getFile().writeString(lineStr + '\n');
             this.getFile().flush();
         }
         try {
             // This can fail if stdout has been overriden
-            Sys.println(line);
+            Sys.println(lineStr);
         } catch (ex: Dynamic) {}
     }
 
@@ -70,5 +71,15 @@ class FileLoggerWriter extends Base implements ILoggerWriter {
         #end
         }
         return this.file;
+    }
+
+    public function setFile(): Void{
+
+    }
+
+    public function copy(): FileLoggerWriter{
+        final newCopy = new FileLoggerWriter();
+        newCopy.setFilename(this.getFilename());
+        return newCopy;
     }
 }

@@ -31,6 +31,10 @@ class Item extends IdModel {
     public var params: Collection<Param>;
 
 
+    /** Item status. One of: draft, published, endofsale. **/
+    public var status: String;
+
+
     // Undocumented fields (they appear in PHP SDK)
 
 
@@ -56,6 +60,22 @@ class Item extends IdModel {
 
     /** Name. **/
     public var name: String;
+
+
+    /** Description. **/
+    public var description: String;
+
+
+    /** Billing information (only for `SubscriptionRequest`) **/
+    public var billing: ItemBilling;
+
+
+    public function new() {
+        super();
+        this._setFieldClassNames([
+            'billing' => 'ItemBilling',
+        ]);
+    }
 
 
     /** @returns The `Param` with the given id, or `null` if it was not found. **/

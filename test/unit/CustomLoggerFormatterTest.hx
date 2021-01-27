@@ -1,20 +1,22 @@
 /*
     This file is part of the Ingram Micro CloudBlue Connect SDK.
     Copyright (c) 2019 Ingram Micro. All Rights Reserved.
- */
-
+*/
 import test.util.ArrayLoggerWriter;
 import connect.logger.ILoggerFormatter;
 import connect.logger.LoggerHandler;
 import connect.logger.LoggerConfig;
 import connect.Env;
 import connect.util.Collection;
-import connect.util.Util;
 import massive.munit.Assert;
 import connect.Base;
 
 class CustomLoggerFormatter extends Base implements ILoggerFormatter {
-    public function formatSection(level:Int, text:String):String {
+
+    public function setRequest(requestId:Null<String>) {}
+
+
+    public function formatSection(level:Int, sectionLevel:Int, text:String):String {
         return text;
     }
 
@@ -51,6 +53,14 @@ class CustomLoggerFormatter extends Base implements ILoggerFormatter {
         }
         return textLevel + " - " + this.marketPlace + " - " + this.hub + " - " + this.customer + " - " + text;
     }
+
+    public function getFileExtension():String {
+        return 'txt';
+    }
+
+    public function copy(): CustomLoggerFormatter{
+        return new CustomLoggerFormatter(this.marketPlace,this.hub,this.customer);
+    }
 }
 
 class CustomLoggerFormatterTest {
@@ -63,6 +73,7 @@ class CustomLoggerFormatterTest {
 
     @Test
     public function testFormatter() {
+        Env._reset();
         Env.initLogger(new LoggerConfig().handlers(new Collection<LoggerHandler>().push(new LoggerHandler(new CustomLoggerFormatter("MP-000-000", "HUB-1",
             "1000001"), new ArrayLoggerWriter()))));
         Env.getLogger().error("TEST FORMATTER");

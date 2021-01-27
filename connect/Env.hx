@@ -4,26 +4,22 @@
 */
 package connect;
 
+import connect.logger.ILoggerFormatter;
+import connect.logger.LoggerHandler;
 import connect.api.IApiClient;
-import connect.api.IFulfillmentApi;
-import connect.api.IGeneralApi;
-import connect.api.IMarketplaceApi;
-import connect.api.ITierApi;
-import connect.api.IUsageApi;
+import connect.api.FulfillmentApi;
+import connect.api.GeneralApi;
+import connect.api.impl.ApiClientImpl;
+import connect.api.MarketplaceApi;
+import connect.api.SubscriptionsApi;
+import connect.api.TierApi;
+import connect.api.UsageApi;
 import connect.api.Query;
 import connect.logger.Logger;
 import connect.logger.LoggerConfig;
 import connect.util.Collection;
 import connect.util.Dictionary;
-
-// Need to make sure that these get compiled
-import connect.api.impl.ApiClientImpl;
-import connect.api.impl.FulfillmentApiImpl;
-import connect.api.impl.GeneralApiImpl;
-import connect.api.impl.MarketplaceApiImpl;
-import connect.api.impl.TierApiImpl;
-import connect.api.impl.UsageApiImpl;
-
+import connect.models.IdModel;
 
 /**
     In order to be able to perform their tasks, many classes in the SDK rely on the global
@@ -52,6 +48,19 @@ import connect.api.impl.UsageApiImpl;
     environment.
 **/
 class Env extends Base {
+    private static var config: Config;
+    private static var loggers: Dictionary = new Dictionary();
+    private static var defaultQuery: Query;
+    private static var apiClient: IApiClient;
+    private static var fulfillmentApi: FulfillmentApi;
+    private static var usageApi: UsageApi;
+    private static var tierApi: TierApi;
+    private static var generalApi: GeneralApi;
+    private static var marketplaceApi: MarketplaceApi;
+    private static var subscriptionsApi: SubscriptionsApi;
+
+    private static inline var ROOT_LOGGER: String = "root";
+
     /**
         Initializes the configuration object. It must have not been previously configured.
 
@@ -69,7 +78,6 @@ class Env extends Base {
         }
     }
     
-
     /**
         Initializes the configuration object using a JSON file.  It must have not been previously
         configured.
@@ -85,11 +93,10 @@ class Env extends Base {
             final apiUrl = dict.get('apiEndpoint');
             final apiKey = dict.get('apiKey');
             final configProducts: Dynamic = dict.get('products');
-            final products: Collection<String> = Std.is(configProducts, Collection)
-                ? configProducts
-                : Std.is(configProducts, String)
-                ? Collection._fromArray([configProducts])
-                : null;
+            final products: Collection<String> =
+                Std.is(configProducts, Collection) ? configProducts :
+                Std.is(configProducts, String) ? Collection._fromArray([configProducts]) :
+                null;
             dict.remove('apiEndpoint');
             dict.remove('apiKey');
             dict.remove('products');
@@ -99,7 +106,6 @@ class Env extends Base {
         }
     }
 
-
     /**
         @returns `true` if config has already been initialized, `false` otherwise.
     **/
@@ -107,15 +113,14 @@ class Env extends Base {
         return config != null;
     }
 
-
     /**
         Initializes the logger. It must have not been previously configured.
 
         @param config The configuration of the logger.
     **/
     public static function initLogger(config: LoggerConfig): Void {
-        if (logger == null) {
-            logger = new Logger(config);
+        if(!loggers.exists(ROOT_LOGGER)){
+            loggers.set(ROOT_LOGGER,new Logger(config));
         } else {
             throw "Logger instance is already initialized.";
         }
@@ -123,12 +128,58 @@ class Env extends Base {
 
 
     /**
+        Get logger for given request, if it doesnt exists it will be created and context specified.
+     **/
+    public static function getLoggerForRequest(request: Null<IdModel>): Logger {
+        if(request != null && Reflect.field(request,"id") != null) {
+            if(!loggers.exists(request.id)) {
+                final originalConfig:LoggerConfig = loggers.get(ROOT_LOGGER).getInitialConfig();
+                final requestLogger = new Logger(copyLoggerConfig(originalConfig));
+                for (handler in requestLogger.getHandlers()) {
+                        handler.formatter.setRequest(request.id);
+                }
+                requestLogger.setFilenameForRequest(request);
+                loggers.set(request.id,requestLogger);
+            }
+            return loggers.get(request.id);
+        }
+
+        if (!loggers.exists(ROOT_LOGGER)) {
+            final requestLogger = new Logger(null);
+            loggers.set(ROOT_LOGGER,requestLogger);
+        }
+
+        return loggers.get(ROOT_LOGGER);
+    }
+
+    /**
+        @returns cloned LoggerConfig object
+    **/
+    private static function copyLoggerConfig(initialConfig: LoggerConfig): LoggerConfig {
+        final newConfig: LoggerConfig = new LoggerConfig();
+        newConfig.path(initialConfig.path_);
+        newConfig.level(initialConfig.level_);
+        newConfig.maskedFields(initialConfig.maskedFields_);
+        newConfig.maskedParams(initialConfig.maskedParams_);
+        newConfig.beautify(initialConfig.beautify_);
+        newConfig.compact(initialConfig.compact_);
+        newConfig.regexMaskingList_ = initialConfig.regexMaskingList_;
+        final newHandlers = new Collection<LoggerHandler>();
+        for(handler in  initialConfig.handlers_){
+            final newHandler = new LoggerHandler(handler.formatter.copy(),handler.writer.copy());
+            newHandlers.push(newHandler);
+        }
+        newConfig.handlers(newHandlers);
+        return newConfig;
+    }
+
+
+    /**
         @returns `true` if logger has already been initialized, `false` otherwise.
     **/
     public static function isLoggerInitialized(): Bool {
-        return logger != null;
+        return loggers.exists(ROOT_LOGGER);
     }
-
 
     /**
      * Initializes the default `Query`. This query can contain common filters and be easily
@@ -143,14 +194,12 @@ class Env extends Base {
         }
     }
 
-
     /**
      * @returns `true` if default query has already been set, `false` otherwise;
      */
     public static function isDefaultQueryInitialized(): Bool {
         return defaultQuery != null;
     }
-
 
     /**
         Returns the configuration object. If it is not initialized, it tries to initialize it from
@@ -167,10 +216,9 @@ class Env extends Base {
         return config;
     }
 
-
     /**
         Returns the logger object. If it is not initialized, it will initialize it in the level
-        `Info` with a filename of "log.md".
+        `Info` with the path "logs".
 
         @returns The environment logger.
     **/
@@ -178,9 +226,8 @@ class Env extends Base {
         if (!isLoggerInitialized()) {
             initLogger(null);
         }
-        return logger;
+        return loggers.get(ROOT_LOGGER);
     }
-
 
     /**
         @returns The API Client, used to make all low level Http requests to the platform.
@@ -188,148 +235,75 @@ class Env extends Base {
     **/
     public static function getApiClient(): IApiClient {
         if (apiClient == null) {
-            apiClient = createInstance('IApiClient');
+            apiClient = new ApiClientImpl();
         }
         return apiClient;
     }
 
-
-    /**
-        @returns The Fulfillment API instance, used to make all fulfillment requests to the
-        platform.
-        @throws String If a class implementing the IFulfillmentApi interface cannot be instanced.
-    **/
     @:dox(hide)
-    public static function getFulfillmentApi(): IFulfillmentApi {
+    public static function getFulfillmentApi(): FulfillmentApi {
         if (fulfillmentApi == null) {
-            fulfillmentApi = createInstance('IFulfillmentApi');
+            fulfillmentApi = new FulfillmentApi();
         }
         return fulfillmentApi;
     }
 
-
-    /**
-        @returns The Usage API instance, used to make all usage requests to the platform.
-        @throws String If a class implementing the IUsageApi interface cannot be instanced.
-    **/
     @:dox(hide)
-    public static function getUsageApi(): IUsageApi {
+    public static function getUsageApi(): UsageApi {
         if (usageApi == null) {
-            usageApi = createInstance('IUsageApi');
+            usageApi = new UsageApi();
         }
         return usageApi;
     }
 
-
-    /**
-        @returns The Tier API instance, used to make all tier requests to the platform.
-        @throws String If a class implementing the ITierApi interface cannot be instanced.
-    **/
     @:dox(hide)
-    public static function getTierApi(): ITierApi {
+    public static function getTierApi(): TierApi {
         if (tierApi == null) {
-            tierApi = createInstance('ITierApi');
+            tierApi = new TierApi();
         }
         return tierApi;
     }
 
-
-    /**
-        @returns The General API instance, used to make all general requests to the platform.
-        @throws String If a class implementing the IGeneralApi interface cannot be instanced.
-    **/
     @:dox(hide)
-    public static function getGeneralApi(): IGeneralApi {
+    public static function getGeneralApi(): GeneralApi {
         if (generalApi == null) {
-            generalApi = createInstance('IGeneralApi');
+            generalApi = new GeneralApi();
         }
         return generalApi;
     }
 
+    @:dox(hide)
+    public static function getSubscriptionsApi(): SubscriptionsApi {
+        if (subscriptionsApi == null) {
+            subscriptionsApi = new SubscriptionsApi();
+        }
+        return subscriptionsApi;
+    }
 
     @:dox(hide)
-    public static function getMarketplaceApi(): IMarketplaceApi {
+    public static function getMarketplaceApi(): MarketplaceApi {
         if (marketplaceApi == null) {
-            marketplaceApi = createInstance('IMarketplaceApi');
+            marketplaceApi = new MarketplaceApi();
         }
         return marketplaceApi;
     }
 
-
     @:dox(hide)
-    public static function _reset(?deps: Dictionary) {
+    public static function _reset(?client: IApiClient = null) {
         config = null;
-        logger = null;
+        loggers = new Dictionary();
         defaultQuery = null;
-        apiClient = null;
+        apiClient = client;
         fulfillmentApi = null;
         usageApi = null;
         tierApi = null;
         generalApi = null;
         marketplaceApi = null;
-        dependencies = null;
-        init(deps);
+        subscriptionsApi = null;
     }
-
 
     @:dox(hide)
     public static function _getDefaultQuery(): Query {
         return defaultQuery;
-    }
-
-
-    private static var config: Config;
-    private static var logger: Logger;
-    private static var defaultQuery: Query;
-    private static var apiClient: IApiClient;
-    private static var fulfillmentApi: IFulfillmentApi;
-    private static var usageApi: IUsageApi;
-    private static var tierApi: ITierApi;
-    private static var generalApi: IGeneralApi;
-    private static var marketplaceApi: IMarketplaceApi;
-    private static var defaultDependencies : Dictionary;
-    private static var dependencies: Dictionary;
-
-
-    private static function init(?deps: Dictionary): Void {
-        initDefaultDependencies();
-        if (dependencies == null) {
-            dependencies = new Dictionary();
-            if (deps != null) {
-                final keys = deps.keys();
-                for (key in keys) {
-                    if (defaultDependencies.exists(key)) {
-                        dependencies.setString(key, deps.getString(key));
-                    }
-                }
-            }
-        }
-    }
-    
-    
-    private static function initDefaultDependencies(): Void {
-        if (defaultDependencies == null) {
-            defaultDependencies = new Dictionary()
-                .setString('IApiClient', 'connect.api.impl.ApiClientImpl')
-                .setString('IFulfillmentApi', 'connect.api.impl.FulfillmentApiImpl')
-                .setString('IUsageApi', 'connect.api.impl.UsageApiImpl')
-                .setString('ITierApi', 'connect.api.impl.TierApiImpl')
-                .setString('IGeneralApi', 'connect.api.impl.GeneralApiImpl')
-                .setString('IMarketplaceApi', 'connect.api.impl.MarketplaceApiImpl');
-        }
-    }
-
-
-    private static function createInstance(interfaceName: String): Dynamic {
-        init();
-        final className = (dependencies.exists(interfaceName))
-            ? dependencies.getString(interfaceName)
-            : defaultDependencies.getString(interfaceName);
-        final classObj = Type.resolveClass(className);
-        if (classObj != null) {
-            return Type.createInstance(classObj, []);
-        } else {
-            throw 'Cannot find class name "${className}"';
-        }
     }
 }

@@ -8,7 +8,6 @@ import connect.api.Query;
 import connect.util.Collection;
 import connect.util.DateTime;
 
-
 /**
  * A Listing represents the the actual publishing procedure in the Connect platform.
  */
@@ -16,26 +15,20 @@ class Listing extends IdModel {
     /** Status of the listing. One of: listed, unlisted. **/
     public var status: String;
 
-
     /** Distribution contract. **/
     public var contract: Contract;
-
 
     /** Product reference. **/
     public var product: Product;
 
-
     /** Listing creation date. **/
     public var created: DateTime;
-
 
     /** Vendor account reference. **/
     public var vendor: Account;
 
-
     /** Provider account reference. **/
     public var provider: Account;
-
 
     /**
      * Indicates whether the product is available in wholesale catalog.
@@ -43,10 +36,8 @@ class Listing extends IdModel {
      */
     public var sourcing: ListingSourcing;
 
-
     /** ListingRequest reference. **/
     public var pendingRequest: ListingRequest;
-
 
     public function new() {
         super();
@@ -58,7 +49,6 @@ class Listing extends IdModel {
             'pendingRequest' => 'ListingRequest',
         ]);
     }
-
 
     /**
         Lists all listings that match the given filters. Supported filters are:
@@ -78,7 +68,6 @@ class Listing extends IdModel {
         return Model.parseArray(Listing, listings);
     }
 
-
     /** @returns The Listing with the given id, or `null` if it was not found. **/
     public static function get(id: String): Listing {
         try {
@@ -88,7 +77,6 @@ class Listing extends IdModel {
             return null;
         }
     }
-
 
     /**
         Puts the listing in the Connect platform with the data changed in `this` model.
@@ -110,7 +98,7 @@ class Listing extends IdModel {
         if (hasModifiedFields) {
             final listing = Env.getMarketplaceApi().putListing(
                 this.id,
-                haxe.Json.stringify(diff));
+                haxe.Json.stringify(diff),this);
             return Model.parse(Listing, listing);
         } else {
             return this;
